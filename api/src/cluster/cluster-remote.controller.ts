@@ -84,6 +84,12 @@ export class ClusterRemoteController {
   }
 
   @RequireClusterWrite()
+  @Post('instances/:id/awake')
+  awake(@Param('id') id: string) {
+    return this.instances.awake(id);
+  }
+
+  @RequireClusterWrite()
   @Post('instances/:id/remove')
   remove(@Param('id') id: string) {
     return this.instances.remove(id);

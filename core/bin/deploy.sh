@@ -51,9 +51,18 @@ trap cleanup_merged_env EXIT
 
 clone_or_update_repo() {
   if [[ -d "${TARGET_DIR}/.git" ]]; then
-    git -C "$TARGET_DIR" fetch origin
-    git -C "$TARGET_DIR" checkout "$BRANCH" || git -C "$TARGET_DIR" checkout -b "$BRANCH" "origin/${BRANCH}"
-    git -C "$TARGET_DIR" pull --ff-only origin "$BRANCH" || git -C "$TARGET_DIR" pull --ff-only || true
+    log "[deploy] updating checkout ${TARGET_DIR} → ${BRANCH}"
+    if [[ -n "$GIT_URL" ]]; then
+      git -C "$TARGET_DIR" remote set-url origin "$GIT_URL" 2>/dev/null || true
+    fi
+    git -C "$TARGET_DIR" fetch origin --prune
+    if git -C "$TARGET_DIR" rev-parse --verify "origin/${BRANCH}" >/dev/null 2>&1; then
+      git -C "$TARGET_DIR" checkout -B "$BRANCH" "origin/${BRANCH}"
+      git -C "$TARGET_DIR" reset --hard "origin/${BRANCH}"
+    else
+      git -C "$TARGET_DIR" checkout "$BRANCH" || git -C "$TARGET_DIR" checkout -b "$BRANCH"
+      git -C "$TARGET_DIR" pull --ff-only origin "$BRANCH"
+    fi
   else
     mkdir -p "$(dirname "$TARGET_DIR")"
     if git clone --depth 1 --branch "$BRANCH" "$GIT_URL" "$TARGET_DIR" 2>/dev/null; then

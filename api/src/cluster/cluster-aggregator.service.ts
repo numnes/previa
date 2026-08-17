@@ -315,6 +315,20 @@ export class ClusterAggregatorService {
     return this.tag(updated, ref, encodeRemoteId(node.id, updated.id));
   }
 
+  async awakeRemoteInstance(
+    nodeId: string,
+    remoteId: string,
+  ): Promise<WithNode<InstanceListItem>> {
+    const node = await this.nodes.findById(nodeId);
+    const ref = this.remoteRef(node);
+    const updated = await this.clusterFetch<InstanceListItem>(
+      node,
+      `/cluster/instances/${encodeURIComponent(remoteId)}/awake`,
+      { method: 'POST' },
+    );
+    return this.tag(updated, ref, encodeRemoteId(node.id, updated.id));
+  }
+
   async removeRemoteInstance(
     nodeId: string,
     remoteId: string,

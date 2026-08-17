@@ -265,7 +265,7 @@ async function handleInstances(
     if (!row) throw new DemoHttpError(404, 'Instance not found');
     if (!row.canWrite) throw new DemoHttpError(403, 'Read-only node');
     if (row.status !== 'active') throw new DemoHttpError(400, 'Only active');
-    return touchInstance(parts[1], { status: 'paused', port: null });
+    return touchInstance(parts[1], { status: 'paused', port: null, idleSleep: false });
   }
   if (method === 'POST' && parts.length === 3 && parts[2] === 'activate') {
     await delay(300);
@@ -275,9 +275,29 @@ async function handleInstances(
     const next = touchInstance(parts[1], {
       status: 'deploying',
       lastDeployError: null,
+      idleSleep: false,
     });
     scheduleDemoDeploy(parts[1]);
     return next;
+  }
+  if (method === 'POST' && parts.length === 3 && parts[2] === 'awake') {
+    await delay(400);
+    const row = s.instances.find((i) => i.id === parts[1]);
+    if (!row) throw new DemoHttpError(404, 'Instance not found');
+    if (!row.canWrite) throw new DemoHttpError(403, 'Read-only node');
+    if (row.status !== 'paused' || !row.idleSleep) {
+      throw new DemoHttpError(400, 'Only idle-sleep instances can be awoken');
+    }
+    return touchInstance(parts[1], {
+      status: 'active',
+      idleSleep: false,
+      port: row.port ?? 4100,
+      runtimeOnline: true,
+      runtimeStatus: 'online',
+      pm2Online: true,
+      active: true,
+      pm2Status: 'online',
+    });
   }
   if (method === 'POST' && parts.length === 3 && parts[2] === 'remove') {
     await delay(300);

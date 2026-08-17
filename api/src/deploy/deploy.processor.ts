@@ -60,6 +60,10 @@ export class DeployProcessor extends WorkerHost {
       return { ok: true, action: 'queued' };
     }
 
+    this.logger.log(
+      `Deploy ${job.data.projectSlug}/${job.data.branch} — clone/fetch + build (inclui instância em idle sleep)`,
+    );
+
     try {
       const appEnv = await this.previewInstances.resolveDeployAppEnv(
         job.data.projectSlug,

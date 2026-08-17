@@ -8,7 +8,7 @@ Ephemeral **preview URLs** for code review and QA before merge:
 - **Environment queue** — when the active slot limit is reached, new deploys stay `waiting` until a preview is paused or destroyed. Up to **3** deploys run in parallel by default (`PREVIA_DEPLOY_CONCURRENCY`); slots are reserved atomically (`active` + `deploying`) so the limit is not exceeded.
 - **Project / instance env vars** — optional defaults per project (Settings), overridable per instance; applied on create/redeploy (merge: checkout `.env` if present → `previa.yaml` `env:` → project → instance). PM2 starts with `cwd` = checkout root (so Nest/`dotenv` find `.env`) and injects the merged map into the process env; Docker via `--env-file`.
 - **Port env names** — on deploy, the allocated host port is written to `PORT`, `SERVER_PORT`, and `APP_PORT` by default. Add extras in **Project settings** or `previa.yaml` (`portEnvNames` / `portEnv`) when the app uses another variable name.
-- **Pause / resume / redeploy** — per instance in the dashboard, or **Restart all instances** on a project
+- **Pause / awake / redeploy** — idle-slept instances get **Awake** (resume without git pull); manual pause uses **Activate / redeploy**. **Restart all instances** on a project still full-redeploys.
 - **Teardown on PR close** — optional workflow removes the instance automatically
 - **Bulk teardown** — **Projects → Settings → Teardown all instances** pauses every active instance for a project
 - **Delete project** — removes the project and destroys all its instances (PM2, nginx, database); checkout directory is removed from disk
@@ -23,7 +23,7 @@ In **Projects → Settings**, you can set optional limits per project:
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | **Max active lifetime** (days / hours)    | While `active`, counts down; when it expires the instance is **paused** (runtime stopped, record kept)          |
 | **Max existence lifetime** (days / hours) | From creation; when it expires the instance is **destroyed** (PM2/Docker + nginx + DB record; checkout removed) |
-| **Idle pause** (minutes)                  | After N minutes without HTTP hits on the preview path, the instance is **slept** (nginx → wake endpoint). The next request resumes PM2 (no rebuild) and responds with **302** to the same URL. Empty / 0 = off (default). |
+| **Idle pause** (minutes)                  | After N minutes without HTTP hits on the preview path, the instance is **slept** (nginx → wake endpoint). The next request, **Awake** in the dashboard, or a new `/deploy` (git fetch + rebuild) brings it back. Empty / 0 = off (default). |
 
 The scheduler runs every minute. The **Instances** list and instance detail page show `activeExpiresAt` and `existenceExpiresAt` when limits apply.
 

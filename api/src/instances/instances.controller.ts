@@ -80,6 +80,15 @@ export class InstancesController {
     return this.instances.activate(id);
   }
 
+  @ApiOkResponse({
+    description: 'Acorda instância em idle sleep (resume sem git pull/rebuild)',
+  })
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/awake')
+  awake(@Param('id') id: string) {
+    return this.instances.awake(id);
+  }
+
   @ApiBearerAuth('jwt')
   @ApiOkResponse({ description: 'Remove instância (destroy + remove do banco)' })
   @UseGuards(JwtAuthGuard)

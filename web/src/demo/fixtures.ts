@@ -269,6 +269,7 @@ export function createDemoInstances(projects: DemoProject[]): DemoInstance[] {
       runner: 'docker',
       port: 4102,
       status: 'paused',
+      idleSleep: true,
       monit: null,
       lastDeployError: null,
       activeExpiresAt: null,

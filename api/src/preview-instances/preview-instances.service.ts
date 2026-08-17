@@ -98,6 +98,8 @@ export type InstanceListItem = {
   envVars: EnvVarsMap;
   /** Envs padrão do projeto (antes do merge com envVars). */
   projectEnvVars: EnvVarsMap;
+  /** Pausa automática por inatividade (idle sleep); nginx aponta para wake. */
+  idleSleep: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -546,6 +548,7 @@ export class PreviewInstancesService {
       monit: runtime.monit ?? null,
       previewUrl,
       lastDeployError: r.lastDeployError,
+      idleSleep: !!r.idleSleep && r.status === 'paused',
       activeExpiresAt,
       existenceExpiresAt,
       hasActiveLifetimeLimit,
@@ -642,6 +645,26 @@ export class PreviewInstancesService {
     } catch {
       return (row.activatedAt ?? row.updatedAt).getTime();
     }
+  }
+
+  async awakeInstance(id: string): Promise<InstanceListItem> {
+    const row = await this.repo.findOne({
+      where: { id },
+      relations: ['project'],
+    });
+    if (!row?.project) throw new NotFoundException();
+    if (row.status !== 'paused' || !row.idleSleep) {
+      throw new BadRequestException(
+        'Só é possível acordar instâncias em idle sleep (use Activate / redeploy para pause manual)',
+      );
+    }
+    await this.ensureAwake(row.project.slug, row.branchSlug);
+    const maps = await this.fetchRuntimeMaps();
+    const fresh = await this.repo.findOne({
+      where: { id },
+      relations: ['project'],
+    });
+    return this.buildListItem(fresh as PreviewInstance, maps);
   }
 
   /**

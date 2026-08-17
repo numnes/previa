@@ -16,6 +16,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   activateInstance,
+  awakeInstance,
   getInstance,
   getInstanceLogs,
   patchInstance,
@@ -30,7 +31,7 @@ import {
 import { formatInstanceCpu, instanceCpuTitle } from '@/lib/instance-monit';
 
 type InstanceTab = 'overview' | 'environment' | 'logs';
-type StatusAction = 'pause' | 'activate' | 'remove' | null;
+type StatusAction = 'pause' | 'activate' | 'awake' | 'remove' | null;
 
 const TERMINAL_STATUSES = new Set(['active', 'paused', 'waiting', 'error']);
 
@@ -266,6 +267,68 @@ export default function InstanceDetailClient() {
     }
   }, [id, toast, waitUntilStatusSettled]);
 
+  const runAwake = useCallback(async () => {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    setStatusAction('awake');
+    const toastId = toast.push({
+      title: 'Waking instance…',
+      description: 'Resuming without pulling the branch.',
+      variant: 'loading',
+    });
+
+    try {
+      const r = await awakeInstance(id);
+      setRow(r);
+      if (r.status === 'waiting') {
+        toast.update(toastId, {
+          title: 'Still waiting',
+          description: 'No free slot; instance remains in the queue.',
+          variant: 'info',
+        });
+      } else if (r.status === 'error') {
+        toast.update(toastId, {
+          title: 'Wake failed',
+          description: 'Check the error banner for details.',
+          variant: 'error',
+        });
+      } else {
+        toast.update(toastId, {
+          title: 'Instance awake',
+          description: `Instance is now ${r.status}.`,
+          variant: 'success',
+        });
+      }
+    } catch {
+      try {
+        const fresh = await getInstance(id);
+        setRow(fresh);
+        if (fresh.status === 'active') {
+          toast.update(toastId, {
+            title: 'Instance awake',
+            description: 'Instance is now active.',
+            variant: 'success',
+          });
+        } else {
+          toast.update(toastId, {
+            title: 'Could not wake',
+            description: 'The wake request failed. Try again.',
+            variant: 'error',
+          });
+        }
+      } catch {
+        toast.update(toastId, {
+          title: 'Could not wake',
+          description: 'The wake request failed. Try again.',
+          variant: 'error',
+        });
+      }
+    } finally {
+      setStatusAction(null);
+      actionLock.current = false;
+    }
+  }, [id, toast]);
+
   const runRemove = useCallback(async () => {
     if (!row || actionLock.current) return;
     if (
@@ -431,19 +494,35 @@ export default function InstanceDetailClient() {
                       >
                         {statusAction === 'pause' ? 'Pausing…' : 'Pause'}
                       </button>
-                      <button
-                        type="button"
-                        className="btn text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={
-                          statusBusy ||
-                          !row.canWrite ||
-                          !['waiting', 'paused', 'error', 'active'].includes(row.status)
-                        }
-                        title={statusBusy ? 'Status change in progress' : undefined}
-                        onClick={() => void runActivate()}
-                      >
-                        {statusAction === 'activate' ? 'Working…' : 'Activate / redeploy'}
-                      </button>
+                      {row.status === 'paused' && row.idleSleep ? (
+                        <button
+                          type="button"
+                          className="btn text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={statusBusy || !row.canWrite}
+                          title={
+                            statusBusy
+                              ? 'Status change in progress'
+                              : 'Resume without git pull or rebuild'
+                          }
+                          onClick={() => void runAwake()}
+                        >
+                          {statusAction === 'awake' ? 'Waking…' : 'Awake'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={
+                            statusBusy ||
+                            !row.canWrite ||
+                            !['waiting', 'paused', 'error', 'active'].includes(row.status)
+                          }
+                          title={statusBusy ? 'Status change in progress' : undefined}
+                          onClick={() => void runActivate()}
+                        >
+                          {statusAction === 'activate' ? 'Working…' : 'Activate / redeploy'}
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="btn text-sm border-rose-200/30 bg-rose-200/10 text-rose-100 hover:bg-rose-200/15 disabled:cursor-not-allowed disabled:opacity-50"
@@ -456,7 +535,7 @@ export default function InstanceDetailClient() {
                     </div>
                     {statusBusy ? (
                       <p className="mt-2 text-sm text-sky-200/80">
-                        Status change in progress — pause and activate stay locked until it
+                        Status change in progress — pause, awake, and activate stay locked until it
                         finishes.
                       </p>
                     ) : null}
@@ -465,6 +544,9 @@ export default function InstanceDetailClient() {
                         <dt className="text-white/55">Status (database)</dt>
                         <dd className="font-mono text-white/90">
                           {row.status}
+                          {row.status === 'paused' && row.idleSleep ? (
+                            <span className="ml-2 text-xs text-amber-200/80">(idle sleep)</span>
+                          ) : null}
                           {statusBusy ? (
                             <span className="ml-2 text-xs text-sky-300/80">(updating)</span>
                           ) : null}
@@ -625,7 +707,7 @@ export default function InstanceDetailClient() {
                         {Object.keys(effectiveEnv).length} var
                         {Object.keys(effectiveEnv).length === 1 ? '' : 's'}
                       </span>
-                      . Use Activate / redeploy to apply.
+                      . Use Activate / redeploy to apply (Awake does not rebuild).
                     </p>
                     <div className="mt-4">
                       <EnvEditor

@@ -30,6 +30,7 @@ export type InstanceRow = {
   } | null;
   previewUrl: string | null;
   lastDeployError: string | null;
+  idleSleep?: boolean;
   activeExpiresAt: string | null;
   existenceExpiresAt: string | null;
   hasActiveLifetimeLimit: boolean;

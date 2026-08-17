@@ -78,6 +78,15 @@ export class InstancesService {
     return this.cluster.tagLocal(row);
   }
 
+  async awake(id: string): Promise<InstanceListItem> {
+    const remote = parseRemoteId(id);
+    if (remote) {
+      return this.cluster.awakeRemoteInstance(remote.nodeId, remote.remoteId);
+    }
+    const row = await this.previewInstances.awakeInstance(id);
+    return this.cluster.tagLocal(row);
+  }
+
   async remove(id: string): Promise<{ ok: true }> {
     const remote = parseRemoteId(id);
     if (remote) {
@@ -113,7 +122,7 @@ export class InstancesService {
       return {
         pm2Name: name,
         lines: safeLines,
-        output: `Sem processo ativo para esta instância (status: ${row.status}). Use “Ativar / redeploy” na página da instância quando houver vaga.`,
+        output: `Sem processo ativo para esta instância (status: ${row.status}). Use “Awake” (idle sleep) ou “Activate / redeploy” na página da instância quando houver vaga.`,
       };
     }
     try {

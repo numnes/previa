@@ -260,6 +260,7 @@ function InstancesPageContent() {
                 <td className="border-b border-white/10 px-3 py-2 text-white/70">
                   <span className="rounded-md bg-white/10 px-2 py-0.5 font-mono text-xs">
                     {i.status}
+                    {i.status === 'paused' && i.idleSleep ? ' · idle' : ''}
                   </span>
                   {i.status === 'error' && i.lastDeployError ? (
                     <p

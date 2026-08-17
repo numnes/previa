@@ -43,6 +43,14 @@ export async function activateInstance(id: string): Promise<InstanceRow> {
   });
 }
 
+export async function awakeInstance(id: string): Promise<InstanceRow> {
+  const token = getTokenClient();
+  return await httpJson<InstanceRow>(`${apiBaseClient()}/instances/${id}/awake`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export async function removeInstance(id: string): Promise<{ ok: true }> {
   const token = getTokenClient();
   return await httpJson<{ ok: true }>(`${apiBaseClient()}/instances/${id}/remove`, {
