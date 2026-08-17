@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { execFile } from 'child_process';
 import { randomBytes } from 'crypto';
+import { existsSync } from 'fs';
 import { readFile, unlink, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -16,6 +17,18 @@ import type { DeployMeta } from './deploy-meta';
 import { pm2AppName } from './pm2-name.util';
 
 const execFileAsync = promisify(execFile);
+
+function coreStateDir(workRoot: string): string {
+  const previa = join(workRoot, '.previa-state');
+  const legacy = join(workRoot, '.deployer-state');
+  if (existsSync(previa)) return previa;
+  if (existsSync(legacy)) return legacy;
+  return previa;
+}
+
+function deployResultPath(workRoot: string, pm2Name: string): string {
+  return join(coreStateDir(workRoot), `${pm2Name}.deploy-result.json`);
+}
 
 export type DeployAppEnvInput = {
   projectEnv?: EnvVarsMap | null;
@@ -76,7 +89,7 @@ export async function runCoreDeployScript(
   }
 
   const pm2Name = pm2AppName(projectSlug, branch);
-  const metaPath = join(workRoot, '.previa-state', `${pm2Name}.deploy-result.json`);
+  const metaPath = deployResultPath(workRoot, pm2Name);
   const raw = await readFile(metaPath, 'utf8');
   const meta = JSON.parse(raw) as DeployMeta;
   await unlink(metaPath).catch(() => undefined);
@@ -176,7 +189,7 @@ export async function runCoreResumeScript(
   }
 
   const pm2Name = pm2AppName(projectSlug, branch);
-  const metaPath = join(workRoot, '.previa-state', `${pm2Name}.deploy-result.json`);
+  const metaPath = deployResultPath(workRoot, pm2Name);
   const raw = await readFile(metaPath, 'utf8');
   const meta = JSON.parse(raw) as DeployMeta;
   await unlink(metaPath).catch(() => undefined);
