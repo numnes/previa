@@ -156,10 +156,18 @@ case "$cmd" in
     source "${ROOT}/scripts/lib/work-root.sh"
     load_previa_public_env "$ROOT"
     previa_sync_work_root_env "$ROOT" >/dev/null
+    if [[ -f "${ROOT}/api/.env" ]]; then
+      set -a
+      # shellcheck disable=SC1091
+      source "${ROOT}/api/.env"
+      set +a
+    fi
     if command -v pm2 >/dev/null 2>&1; then
-      pm2 restart previa-api --update-env >/dev/null 2>&1 \
-        || pm2 restart deployer-api --update-env >/dev/null 2>&1 \
-        || true
+      pm2 delete previa-api >/dev/null 2>&1 || true
+      pm2 delete deployer-api >/dev/null 2>&1 || true
+      if [[ -f "${ROOT}/api/dist/main.js" ]]; then
+        pm2 start "${ROOT}/api/dist/main.js" --name previa-api --time --update-env --cwd "${ROOT}/api" >/dev/null
+      fi
     fi
     echo "[previa] OK — executable, scripts, and PREVIA_WORK_ROOT updated"
     ;;

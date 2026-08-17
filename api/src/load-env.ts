@@ -49,6 +49,13 @@ function parseEnvFile(content: string): Record<string, string> {
 }
 
 /** PM2 may inject empty env vars; Nest/dotenv skip overriding existing keys. */
+const ALWAYS_FROM_FILE = new Set([
+  'PREVIA_WORK_ROOT',
+  'DEPLOYER_WORK_ROOT',
+  'PREVIA_CORE_DIR',
+  'DEPLOYER_CORE_DIR',
+]);
+
 export function patchEmptyEnvFromFile(): void {
   applyEnvAliases();
   const envPath = resolve(process.cwd(), '.env');
@@ -64,8 +71,21 @@ export function patchEmptyEnvFromFile(): void {
   for (const [key, value] of Object.entries(parsed)) {
     if (!value) continue;
     const current = process.env[key];
-    if (current === undefined || current === '') {
+    if (
+      ALWAYS_FROM_FILE.has(key) ||
+      current === undefined ||
+      current === ''
+    ) {
       process.env[key] = value;
+    }
+  }
+
+  // PM2 may still hold a stale DEPLOYER_WORK_ROOT; keep aliases in sync with the file.
+  for (const [neu, old] of ENV_ALIASES) {
+    const fromFile = parsed[neu] || parsed[old];
+    if (fromFile && ALWAYS_FROM_FILE.has(neu)) {
+      process.env[neu] = fromFile;
+      process.env[old] = fromFile;
     }
   }
 
