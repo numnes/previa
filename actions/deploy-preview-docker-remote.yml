@@ -1,8 +1,8 @@
 # Copy to your app repo: .github/workflows/deploy-preview.yml
-# Repository secrets: DEPLOYER_API_URL, DEPLOYER_API_KEY
-# PROJECT_SLUG is set by deployer project init
-# Image is built on GitHub and pushed to __DEPLOYER_REGISTRY__/__DEPLOYER_IMAGE_NAME__
-name: Deploy preview (deployer — Docker remote)
+# Repository secrets: PREVIA_API_URL, PREVIA_API_KEY
+# PROJECT_SLUG is set by previa project init
+# Image is built on GitHub and pushed to __PREVIA_REGISTRY__/__PREVIA_IMAGE_NAME__
+name: Deploy preview (previa — Docker remote)
 
 on:
   pull_request:
@@ -24,7 +24,7 @@ jobs:
       - name: Log in to container registry
         uses: docker/login-action@v3
         with:
-          registry: __DEPLOYER_REGISTRY__
+          registry: __PREVIA_REGISTRY__
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -34,24 +34,24 @@ jobs:
           BRANCH="${{ github.head_ref || github.ref_name }}"
           SLUG="$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]/-/g' | sed 's/^-*//;s/-*$//')"
           TAG="preview-${SLUG}-${{ github.sha }}"
-          IMAGE="__DEPLOYER_REGISTRY__/__DEPLOYER_IMAGE_NAME__:${TAG}"
+          IMAGE="__PREVIA_REGISTRY__/__PREVIA_IMAGE_NAME__:${TAG}"
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
       - name: Request preview deploy
         env:
-          DEPLOYER_API_URL: ${{ secrets.DEPLOYER_API_URL }}
-          DEPLOYER_API_KEY: ${{ secrets.DEPLOYER_API_KEY }}
-          PROJECT_SLUG: __DEPLOYER_PROJECT_SLUG__
+          PREVIA_API_URL: ${{ secrets.PREVIA_API_URL || secrets.DEPLOYER_API_URL }}
+          PREVIA_API_KEY: ${{ secrets.PREVIA_API_KEY || secrets.DEPLOYER_API_KEY }}
+          PROJECT_SLUG: __PREVIA_PROJECT_SLUG__
           IMAGE: ${{ steps.image.outputs.image }}
         run: |
-          if [ -z "$DEPLOYER_API_URL" ] || [ -z "$DEPLOYER_API_KEY" ]; then
-            echo "Set repository secrets DEPLOYER_API_URL and DEPLOYER_API_KEY."
+          if [ -z "$PREVIA_API_URL" ] || [ -z "$PREVIA_API_KEY" ]; then
+            echo "Set repository secrets PREVIA_API_URL and PREVIA_API_KEY (or legacy DEPLOYER_*)."
             exit 1
           fi
           BRANCH="${{ github.head_ref || github.ref_name }}"
-          curl -fsS -X POST "${DEPLOYER_API_URL%/}/deploy" \
+          curl -fsS -X POST "${PREVIA_API_URL%/}/deploy" \
             -H "Content-Type: application/json" \
-            -H "X-Deployer-Api-Key: ${DEPLOYER_API_KEY}" \
+            -H "X-Previa-Api-Key: ${PREVIA_API_KEY}" \
             -d "{\"project\":\"${PROJECT_SLUG}\",\"branch\":\"${BRANCH}\",\"image\":\"${IMAGE}\"}"

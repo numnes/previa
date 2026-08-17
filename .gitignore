@@ -11,4 +11,5 @@ tui/node_modules/
 **/.env
 **/.env.*
 !**/.env.example
+previa.env
 deployer.env

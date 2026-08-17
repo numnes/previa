@@ -89,7 +89,7 @@ export default function ProjectsPage() {
       <PageContainer>
         <PageHeader
           title="Projects"
-          subtitle="Slugs are used by the GitHub Action when calling deploy. Run deployer project init in your app repo to get a registration JSON."
+          subtitle="Slugs are used by the GitHub Action when calling deploy. Run previa project init in your app repo to get a registration JSON."
           action={
             <div className="flex items-center gap-2">
               <ReloadButton onReload={load} title="Reload projects" />
@@ -118,7 +118,7 @@ export default function ProjectsPage() {
               </h2>
               <p className="mt-1 text-xs text-[#8b919a]">
                 Paste the JSON printed at the end of{" "}
-                <code className="text-[#b8bcc4]">deployer project init</code> (between the
+                <code className="text-[#b8bcc4]">previa project init</code> (between the
                 === markers), then apply it to the form or create the project directly.
               </p>
               <textarea
@@ -296,7 +296,7 @@ export default function ProjectsPage() {
             {projects && projects.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-3 py-3 text-white/70">
-                  No projects yet. Click Add project or run deployer project init in your app
+                  No projects yet. Click Add project or run previa project init in your app
                   repo.
                 </td>
               </tr>

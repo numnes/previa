@@ -3,7 +3,7 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeor
 export type ClusterKeyScope = 'read' | 'write';
 
 /**
- * Chave gerada neste nó para que outros deployers se conectem.
+ * Chave gerada neste nó para que outros hosts Previa se conectem.
  * - `read`: leitura de dashboard/projetos/instâncias + logs.
  * - `write`: tudo de `read` + pausar/ativar/remover instâncias.
  */

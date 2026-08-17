@@ -23,18 +23,18 @@ export default function SetupNginxPage() {
             <section>
               <h2 className="font-medium text-[#e8eaed]">1. Locations directory</h2>
               <p className="mt-2">
-                Default: <code className="text-xs">~/deployer/locations</code> (set{' '}
-                <code className="text-xs">DEPLOYER_LOCATIONS_DIR</code> on the API host).
+                Default: <code className="text-xs">~/previa/locations</code> (set{' '}
+                <code className="text-xs">PREVIA_LOCATIONS_DIR</code> on the API host).
               </p>
             </section>
 
             <section>
               <h2 className="font-medium text-[#e8eaed]">2. Wire locations into nginx</h2>
-              <p className="mt-2">On the deployer host, add the include line to an existing site config:</p>
+              <p className="mt-2">On the previa host, add the include line to an existing site config:</p>
               <pre className="mt-2 overflow-x-auto rounded border border-[#3d4048] bg-[#2b2e33] p-3 text-xs text-[#d1d5db]">
-{`deployer setup nginx
-deployer setup nginx -f /etc/nginx/sites-enabled/mysite.conf
-deployer setup nginx --help`}
+{`previa setup nginx
+previa setup nginx -f /etc/nginx/sites-enabled/mysite.conf
+previa setup nginx --help`}
               </pre>
               <p className="mt-2">
                 Lists files in <code className="text-xs">sites-enabled</code> (or use{' '}
@@ -50,7 +50,7 @@ deployer setup nginx --help`}
                 Or generate a full server snippet for a new domain:
               </p>
               <pre className="mt-2 overflow-x-auto rounded border border-[#3d4048] bg-[#2b2e33] p-3 text-xs text-[#d1d5db]">
-{`export DEPLOYER_WORK_ROOT=/path/to/work
+{`export PREVIA_WORK_ROOT=/path/to/work
 ./core/bin/setup-nginx.sh your-domain.com`}
               </pre>
               <p className="mt-2">

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared port helpers for dev-up / deployer setup.
+# Shared port helpers for dev-up / previa setup.
 
 port_in_use() {
   local port="$1"
@@ -13,19 +13,19 @@ docker_host_port() {
 }
 
 # Ports already assigned in this run (avoid API/web/redis/postgres colliding).
-DEPLOYER_PICKED_PORTS=()
+PREVIA_PICKED_PORTS=()
 
-deployer_port_is_picked() {
+previa_port_is_picked() {
   local port="$1"
   local p
-  for p in "${DEPLOYER_PICKED_PORTS[@]}"; do
+  for p in "${PREVIA_PICKED_PORTS[@]}"; do
     [[ "$p" == "$port" ]] && return 0
   done
   return 1
 }
 
-deployer_remember_port() {
-  DEPLOYER_PICKED_PORTS+=("$1")
+previa_remember_port() {
+  PREVIA_PICKED_PORTS+=("$1")
 }
 
 # pick_port PREFERRED CONTAINER INTERNAL_PORT FALLBACK...
@@ -41,7 +41,7 @@ pick_port() {
     local mapped
     mapped="$(docker_host_port "$container" "$internal_port")"
     if [[ -n "$mapped" ]]; then
-      deployer_remember_port "$mapped"
+      previa_remember_port "$mapped"
       echo "$mapped"
       return 0
     fi
@@ -49,11 +49,11 @@ pick_port() {
 
   local candidate
   for candidate in "$preferred" "${fallbacks[@]}"; do
-    if deployer_port_is_picked "$candidate"; then
+    if previa_port_is_picked "$candidate"; then
       continue
     fi
     if ! port_in_use "$candidate"; then
-      deployer_remember_port "$candidate"
+      previa_remember_port "$candidate"
       echo "$candidate"
       return 0
     fi
@@ -64,7 +64,7 @@ pick_port() {
 }
 
 # pick_or_fixed FIXED preferred container internal_port fallbacks...
-# When FIXED is set (from deployer.env), use that port and fail if it is busy
+# When FIXED is set (from previa.env), use that port and fail if it is busy
 # (unless our Docker container already publishes it). Otherwise delegates to pick_port.
 pick_or_fixed() {
   local fixed="${1:-}"
@@ -88,22 +88,22 @@ pick_or_fixed() {
     local mapped
     mapped="$(docker_host_port "$container" "$internal_port")"
     if [[ "$mapped" == "$fixed" ]]; then
-      deployer_remember_port "$fixed"
+      previa_remember_port "$fixed"
       echo "$fixed"
       return 0
     fi
   fi
 
-  if deployer_port_is_picked "$fixed"; then
-    echo "[ports] Fixed port ${fixed} collides with another deployer service in this run." >&2
+  if previa_port_is_picked "$fixed"; then
+    echo "[ports] Fixed port ${fixed} collides with another previa service in this run." >&2
     exit 1
   fi
 
   if port_in_use "$fixed"; then
-    echo "[ports] Fixed port ${fixed} is already in use. Free it or change deployer.env." >&2
+    echo "[ports] Fixed port ${fixed} is already in use. Free it or change previa.env." >&2
     exit 1
   fi
 
-  deployer_remember_port "$fixed"
+  previa_remember_port "$fixed"
   echo "$fixed"
 }

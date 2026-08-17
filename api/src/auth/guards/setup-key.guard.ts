@@ -8,8 +8,8 @@ import { ConfigService } from '@nestjs/config';
 import { extractSetupKey, isValidSetupKey } from './setup-key.util';
 
 /**
- * Exige a chave de setup gerada na máquina root (DEPLOYER_SETUP_KEY),
- * enviada no header X-Deployer-Setup-Key. Falha fechada se não configurada.
+ * Exige a chave de setup gerada na máquina root (PREVIA_SETUP_KEY),
+ * enviada no header X-Previa-Setup-Key. Falha fechada se não configurada.
  */
 @Injectable()
 export class SetupKeyGuard implements CanActivate {
@@ -19,10 +19,13 @@ export class SetupKeyGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<{
       headers: Record<string, string | string[] | undefined>;
     }>();
-    const expected = this.config.get<string>('DEPLOYER_SETUP_KEY') ?? '';
+    const expected =
+      this.config.get<string>('PREVIA_SETUP_KEY') ??
+      this.config.get<string>('DEPLOYER_SETUP_KEY') ??
+      '';
     if (!expected) {
       throw new UnauthorizedException(
-        'Setup key não configurada no servidor (DEPLOYER_SETUP_KEY).',
+        'Setup key não configurada no servidor (PREVIA_SETUP_KEY).',
       );
     }
     const provided = extractSetupKey(req.headers);

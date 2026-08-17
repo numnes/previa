@@ -1,6 +1,8 @@
 import { timingSafeEqual } from 'crypto';
+import { headerValue } from '../../http/header-value';
 
-export const SETUP_KEY_HEADER = 'x-deployer-setup-key';
+export const SETUP_KEY_HEADER = 'x-previa-setup-key';
+export const SETUP_KEY_HEADER_LEGACY = 'x-deployer-setup-key';
 
 /** Comparação de strings resistente a timing attacks. */
 export function timingSafeEqualStr(a: string, b: string): boolean {
@@ -16,10 +18,7 @@ export function timingSafeEqualStr(a: string, b: string): boolean {
 export function extractSetupKey(
   headers: Record<string, string | string[] | undefined>,
 ): string {
-  const raw = headers[SETUP_KEY_HEADER];
-  if (typeof raw === 'string') return raw;
-  if (Array.isArray(raw)) return raw[0] ?? '';
-  return '';
+  return headerValue(headers, SETUP_KEY_HEADER, SETUP_KEY_HEADER_LEGACY);
 }
 
 /** Valida a chave fornecida contra a esperada (configurada na máquina root). */

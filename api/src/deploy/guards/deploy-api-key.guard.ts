@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiKeysService } from '../../api-keys/api-keys.service';
+import { headerValue } from '../../http/header-value';
 
 @Injectable()
 export class DeployApiKeyGuard implements CanActivate {
@@ -12,10 +13,13 @@ export class DeployApiKeyGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<{ headers: Record<string, string | string[] | undefined> }>();
-    const raw = req.headers['x-deployer-api-key'];
-    const key = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : '';
+    const key = headerValue(
+      req.headers,
+      'x-previa-api-key',
+      'x-deployer-api-key',
+    );
     if (!key) {
-      throw new UnauthorizedException('Cabeçalho X-Deployer-Api-Key obrigatório');
+      throw new UnauthorizedException('Cabeçalho X-Previa-Api-Key obrigatório');
     }
     const ok = await this.apiKeys.validateDeployKey(key);
     if (!ok) {

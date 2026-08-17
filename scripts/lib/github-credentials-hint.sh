@@ -6,15 +6,15 @@ print_github_credentials_hint() {
 
 === GitHub credentials on the root machine ===
 
-The deployer clones application repositories on the root server.
+The previa clones application repositories on the root server.
 Configure access before the first deploy:
 
 Option A — SSH deploy key (recommended for servers)
-  ssh-keygen -t ed25519 -C "deployer@$(hostname)" -f ~/.ssh/deployer_deploy_key -N ""
-  cat ~/.ssh/deployer_deploy_key.pub
+  ssh-keygen -t ed25519 -C "previa@$(hostname)" -f ~/.ssh/previa_deploy_key -N ""
+  cat ~/.ssh/previa_deploy_key.pub
   # Add the public key as a Deploy Key (read-only) on each app repo in GitHub.
 
-  export GIT_SSH_COMMAND='ssh -i ~/.ssh/deployer_deploy_key -o IdentitiesOnly=yes'
+  export GIT_SSH_COMMAND='ssh -i ~/.ssh/previa_deploy_key -o IdentitiesOnly=yes'
   # Persist in ~/.bashrc or export before starting the API (PM2).
 
 Option B — HTTPS with Personal Access Token

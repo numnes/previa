@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { execFile } from 'child_process';
 import { access, readFile, readdir } from 'fs/promises';
+import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import { promisify } from 'util';
@@ -36,16 +37,23 @@ export class SetupService {
   constructor(private readonly config: ConfigService) {}
 
   private repoRoot(): string {
-    const core = this.config.get<string>('DEPLOYER_CORE_DIR');
+    const core = this.config.get<string>('PREVIA_CORE_DIR');
     if (core) return join(core, '..');
-    return join(homedir(), 'deployer');
+    const home = homedir();
+    const next = join(home, 'previa');
+    const legacy = join(home, 'deployer');
+    return existsSync(next) ? next : existsSync(legacy) ? legacy : next;
   }
 
   private locationsDir(): string {
-    return (
-      this.config.get<string>('DEPLOYER_LOCATIONS_DIR') ||
-      join(homedir(), 'deployer', 'locations')
-    );
+    const configured = this.config.get<string>('PREVIA_LOCATIONS_DIR');
+    if (configured) return configured;
+    const home = homedir();
+    const next = join(home, 'previa', 'locations');
+    const legacy = join(home, 'deployer', 'locations');
+    if (existsSync(next)) return next;
+    if (existsSync(legacy)) return legacy;
+    return next;
   }
 
   async checkNginx(): Promise<NginxCheckResult> {
@@ -174,10 +182,10 @@ export class SetupService {
       { path: '.github/workflows/deploy-preview-docker-local.yml', src: join(root, 'actions', 'deploy-preview-docker-local.yml') },
       { path: '.github/workflows/deploy-preview-docker-remote.yml', src: join(root, 'actions', 'deploy-preview-docker-remote.yml') },
       { path: '.github/workflows/teardown-preview.yml', src: join(root, 'actions', 'teardown-preview.yml') },
-      { path: 'deployer.yaml', src: join(root, 'examples', 'deployer.yaml') },
-      { path: 'deployer.pm2.yaml', src: join(root, 'examples', 'deployer.pm2.yaml') },
-      { path: 'deployer.docker-local.yaml', src: join(root, 'examples', 'deployer.docker-local.yaml') },
-      { path: 'deployer.docker-remote.yaml', src: join(root, 'examples', 'deployer.docker-remote.yaml') },
+      { path: 'previa.yaml', src: join(root, 'examples', 'previa.yaml') },
+      { path: 'previa.pm2.yaml', src: join(root, 'examples', 'previa.pm2.yaml') },
+      { path: 'previa.docker-local.yaml', src: join(root, 'examples', 'previa.docker-local.yaml') },
+      { path: 'previa.docker-remote.yaml', src: join(root, 'examples', 'previa.docker-remote.yaml') },
     ];
 
     const files: ProjectTemplateFile[] = [];
@@ -187,7 +195,7 @@ export class SetupService {
     }
 
     return {
-      cliCommand: 'deployer project init',
+      cliCommand: 'previa project init',
       files,
     };
   }

@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: deployer-postgres
+    container_name: previa-postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: deployer
@@ -18,7 +18,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: deployer-redis
+    container_name: previa-redis
     command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "${REDIS_PUBLISH_PORT:-6481}:6379"
@@ -32,8 +32,8 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
         NEXT_PUBLIC_BASE_PATH: ${NEXT_PUBLIC_BASE_PATH:-}
-        NEXT_PUBLIC_DEPLOYER_VERSION: ${NEXT_PUBLIC_DEPLOYER_VERSION:-dev}
-    container_name: deployer-web
+        NEXT_PUBLIC_PREVIA_VERSION: ${NEXT_PUBLIC_PREVIA_VERSION:-dev}
+    container_name: previa-web
     ports:
       - "${WEB_PUBLISH_PORT:-3001}:3000"
     environment:

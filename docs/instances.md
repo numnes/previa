@@ -5,15 +5,15 @@
 Ephemeral **preview URLs** for code review and QA before merge:
 
 - **One URL per branch / PR** — e.g. `https://preview.example.com/my-app-feature-xyz/`
-- **Environment queue** — when the active slot limit is reached, new deploys stay `waiting` until a preview is paused or destroyed. Up to **3** deploys run in parallel by default (`DEPLOYER_DEPLOY_CONCURRENCY`); slots are reserved atomically (`active` + `deploying`) so the limit is not exceeded.
-- **Project / instance env vars** — optional defaults per project (Settings), overridable per instance; applied on create/redeploy (merge: checkout `.env` if present → `deployer.yaml` `env:` → project → instance). PM2 starts with `cwd` = checkout root (so Nest/`dotenv` find `.env`) and injects the merged map into the process env; Docker via `--env-file`.
-- **Port env names** — on deploy, the allocated host port is written to `PORT`, `SERVER_PORT`, and `APP_PORT` by default. Add extras in **Project settings** or `deployer.yaml` (`portEnvNames` / `portEnv`) when the app uses another variable name.
+- **Environment queue** — when the active slot limit is reached, new deploys stay `waiting` until a preview is paused or destroyed. Up to **3** deploys run in parallel by default (`PREVIA_DEPLOY_CONCURRENCY`); slots are reserved atomically (`active` + `deploying`) so the limit is not exceeded.
+- **Project / instance env vars** — optional defaults per project (Settings), overridable per instance; applied on create/redeploy (merge: checkout `.env` if present → `previa.yaml` `env:` → project → instance). PM2 starts with `cwd` = checkout root (so Nest/`dotenv` find `.env`) and injects the merged map into the process env; Docker via `--env-file`.
+- **Port env names** — on deploy, the allocated host port is written to `PORT`, `SERVER_PORT`, and `APP_PORT` by default. Add extras in **Project settings** or `previa.yaml` (`portEnvNames` / `portEnv`) when the app uses another variable name.
 - **Pause / resume / redeploy** — per instance in the dashboard, or **Restart all instances** on a project
 - **Teardown on PR close** — optional workflow removes the instance automatically
 - **Bulk teardown** — **Projects → Settings → Teardown all instances** pauses every active instance for a project
 - **Delete project** — removes the project and destroys all its instances (PM2, nginx, database); checkout directory is removed from disk
 - **Instance lifetime** — optional per-project limits to auto-pause (active time) or auto-remove (total existence); see below
-- **Multi-machine dashboard** — connect other deployer hosts and manage them from one panel; see [Cluster](cluster.md)
+- **Multi-machine dashboard** — connect other previa hosts and manage them from one panel; see [Cluster](cluster.md)
 
 ## Instance lifetime
 

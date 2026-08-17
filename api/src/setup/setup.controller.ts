@@ -17,7 +17,7 @@ export class SetupController {
   }
 
   @ApiBearerAuth('jwt')
-  @ApiOkResponse({ description: 'Workflows e deployer.yaml para integração com repositórios' })
+  @ApiOkResponse({ description: 'Workflows e previa.yaml para integração com repositórios' })
   @UseGuards(JwtAuthGuard)
   @Get('project-templates')
   projectTemplates() {

@@ -6,7 +6,7 @@ Useful for walkthroughs and for hosting a static copy on **GitHub Pages**.
 
 ## Live demo
 
-**https://numnes.github.io/deployer/login/?demo=1**
+**https://numnes.github.io/previa/login/?demo=1**
 
 | User | Email | Password | Role |
 |------|-------|----------|------|
@@ -45,7 +45,7 @@ Serve `web/out` with any static host. To publish from CI, copy [`docs/examples/d
 
 ## How it works
 
-1. `enableDemoMode()` sets `localStorage.deployer_demo=1` (or the build is forever-demo via env).
+1. `enableDemoMode()` sets `localStorage.previa_demo=1` (or the build is forever-demo via env).
 2. `httpJson` routes to `web/src/demo/router.ts` instead of `fetch`.
 3. Fixtures live in `web/src/demo/fixtures.ts` (projects on local + remote nodes, roles, metrics).
 

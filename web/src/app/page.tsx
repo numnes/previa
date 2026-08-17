@@ -217,7 +217,7 @@ export default function HomePage() {
           <div className="card p-5 lg:col-span-2">
             <h2 className="text-base font-semibold text-[#e8eaed]">Server resources</h2>
             <p className="mt-1 text-sm text-[#8b919a]">
-              CPU, memory, and disk per connected deployer node.
+              CPU, memory, and disk per connected previa node.
             </p>
             <div className="mt-4 space-y-4">
               {hosts.length > 0 ? (

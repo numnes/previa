@@ -64,7 +64,11 @@ export class SettingsService implements OnModuleInit {
   async getNodeLabel(): Promise<string> {
     const fromSettings = (await this.getValue(NODE_LABEL_KEY))?.trim();
     if (fromSettings) return fromSettings;
-    const fromEnv = this.config.get<string>('DEPLOYER_NODE_LABEL')?.trim();
+    const fromEnv = (
+      this.config.get<string>('PREVIA_NODE_LABEL') ||
+      this.config.get<string>('DEPLOYER_NODE_LABEL') ||
+      ''
+    ).trim();
     if (fromEnv) return fromEnv;
     return os.hostname();
   }

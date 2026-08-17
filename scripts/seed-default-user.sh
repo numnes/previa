@@ -4,13 +4,13 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-if [[ -n "${DEPLOYER_SKIP_SEED_USER:-}" ]]; then
-  echo "[seed-user] DEPLOYER_SKIP_SEED_USER set; skipping default user."
+if [[ -n "${PREVIA_SKIP_SEED_USER:-}" ]]; then
+  echo "[seed-user] PREVIA_SKIP_SEED_USER set; skipping default user."
   exit 0
 fi
 
-if ! docker ps --format '{{.Names}}' | grep -qx deployer-postgres; then
-  echo "[seed-user] Container deployer-postgres is not running." >&2
+if ! docker ps --format '{{.Names}}' | grep -qxE 'previa-postgres|deployer-postgres'; then
+  echo "[seed-user] Container previa-postgres is not running." >&2
   exit 1
 fi
 
@@ -21,10 +21,11 @@ if [[ -f "${ROOT_DIR}/api/.env" ]]; then
   set +a
 fi
 
-if [[ -z "${DEPLOYER_SETUP_KEY:-}" ]]; then
-  echo "[seed-user] DEPLOYER_SETUP_KEY missing in api/.env. Run deployer setup first." >&2
+if [[ -z "${PREVIA_SETUP_KEY:-${DEPLOYER_SETUP_KEY:-}}" ]]; then
+  echo "[seed-user] PREVIA_SETUP_KEY missing in api/.env. Run previa setup first." >&2
   exit 1
 fi
+export PREVIA_SETUP_KEY="${PREVIA_SETUP_KEY:-$DEPLOYER_SETUP_KEY}"
 
 run_seed() {
   node "${ROOT_DIR}/scripts/seed-default-user.js"
@@ -36,7 +37,7 @@ prompt_credentials() {
   echo ""
   echo "[seed-user] Dashboard login"
   read -r -p "Email: " email
-  export DEPLOYER_SEED_EMAIL="$email"
+  export PREVIA_SEED_EMAIL="$email"
 
   while true; do
     read -r -s -p "Password (min. 8 characters): " password
@@ -51,13 +52,13 @@ prompt_credentials() {
       echo "Passwords do not match." >&2
       continue
     fi
-    export DEPLOYER_SEED_PASSWORD="$password"
+    export PREVIA_SEED_PASSWORD="$password"
     break
   done
 }
 
-if [[ -n "${DEPLOYER_SEED_EMAIL:-}" && -n "${DEPLOYER_SEED_PASSWORD:-}" ]]; then
-  echo "[seed-user] Using DEPLOYER_SEED_EMAIL / DEPLOYER_SEED_PASSWORD from environment."
+if [[ -n "${PREVIA_SEED_EMAIL:-}" && -n "${PREVIA_SEED_PASSWORD:-}" ]]; then
+  echo "[seed-user] Using PREVIA_SEED_EMAIL / PREVIA_SEED_PASSWORD from environment."
   run_seed
   exit 0
 fi
@@ -74,8 +75,8 @@ if [[ "$user_count" -gt 0 ]]; then
     [[ -n "$email" ]] && echo "  - ${email}"
   done < <(node "${ROOT_DIR}/scripts/seed-default-user.js" list 2>/dev/null || true)
 
-  if [[ "${DEPLOYER_YES:-}" == "1" ]]; then
-    echo "[seed-user] DEPLOYER_YES=1; skipping user setup."
+  if [[ "${PREVIA_YES:-}" == "1" ]]; then
+    echo "[seed-user] PREVIA_YES=1; skipping user setup."
     exit 0
   fi
 

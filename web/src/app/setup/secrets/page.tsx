@@ -6,16 +6,16 @@ import { RequireAuth } from '@/components/RequireAuth';
 
 const SECRETS = [
   {
-    name: 'DEPLOYER_API_URL',
+    name: 'PREVIA_API_URL',
     where: 'Repository secrets (GitHub)',
-    description: 'Deployer API base URL, no trailing slash.',
-    example: 'https://deployer.example.com',
+    description: 'Previa API base URL, no trailing slash.',
+    example: 'https://previa.example.com',
   },
   {
-    name: 'DEPLOYER_API_KEY',
+    name: 'PREVIA_API_KEY',
     where: 'Repository secrets (GitHub)',
     description:
-      'API key from Users → API Keys. Sent in the X-Deployer-Api-Key header.',
+      'API key from Users → API Keys. Sent in the X-Previa-Api-Key header.',
     example: '(shown once when the key is created)',
   },
 ];
@@ -26,7 +26,7 @@ export default function SetupSecretsPage() {
       <PageContainer>
         <PageHeader
           title="Secrets"
-          subtitle="Configure these in the application repo that runs preview workflows. The project slug is set in the workflow files by deployer project init."
+          subtitle="Configure these in the application repo that runs preview workflows. The project slug is set in the workflow files by previa project init."
         />
         <div className="card p-5">
           <div>

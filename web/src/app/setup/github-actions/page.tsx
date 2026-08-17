@@ -36,7 +36,7 @@ export default function SetupGithubActionsPage() {
 
   const workflowFiles =
     templates?.files.filter((f) => f.path.startsWith('.github/workflows/')) ?? [];
-  const deployerYaml = templates?.files.find((f) => f.path === 'deployer.yaml');
+  const previaYaml = templates?.files.find((f) => f.path === 'previa.yaml');
 
   return (
     <RequireAuth>
@@ -53,21 +53,21 @@ export default function SetupGithubActionsPage() {
                 From your application repo root, run the command below. It creates{' '}
                 <code className="rounded bg-[#2b2e33] px-1.5 py-0.5 text-xs">.github/workflows/</code>{' '}
                 with both workflows and copies{' '}
-                <code className="rounded bg-[#2b2e33] px-1.5 py-0.5 text-xs">deployer.yaml</code>{' '}
+                <code className="rounded bg-[#2b2e33] px-1.5 py-0.5 text-xs">previa.yaml</code>{' '}
                 to the project root.
               </p>
               <div className="mt-3">
                 <CodeBlock
                   title="Terminal — in your app folder"
-                  content={`# current directory\n${templates?.cliCommand ?? 'deployer project init'}\n\n# explicit path\n${templates?.cliCommand ?? 'deployer project init'} ../my-app\n\n# PR target branches (default: master,homologation)\n${templates?.cliCommand ?? 'deployer project init'} --branches main,develop\n\n# overwrite existing files\n${templates?.cliCommand ?? 'deployer project init'} --force`}
+                  content={`# current directory\n${templates?.cliCommand ?? 'previa project init'}\n\n# explicit path\n${templates?.cliCommand ?? 'previa project init'} ../my-app\n\n# PR target branches (default: master,homologation)\n${templates?.cliCommand ?? 'previa project init'} --branches main,develop\n\n# overwrite existing files\n${templates?.cliCommand ?? 'previa project init'} --force`}
                 />
               </div>
               <p className="mt-3 text-[#8b919a]">
                 Files created:{' '}
                 <code className="text-xs">.github/workflows/deploy-preview.yml</code>,{' '}
                 <code className="text-xs">.github/workflows/teardown-preview.yml</code>,{' '}
-                <code className="text-xs">deployer.yaml</code>. Then adjust{' '}
-                <code className="text-xs">deployer.yaml</code> (build and PM2 target) and commit.
+                <code className="text-xs">previa.yaml</code>. Then adjust{' '}
+                <code className="text-xs">previa.yaml</code> (build and PM2 target) and commit.
               </p>
             </section>
 
@@ -96,26 +96,26 @@ export default function SetupGithubActionsPage() {
             </section>
 
             <section>
-              <h2 className="font-medium text-[#e8eaed]">3. deployer.yaml</h2>
+              <h2 className="font-medium text-[#e8eaed]">3. previa.yaml</h2>
               <p className="mt-2">
                 At the application repo root (same level as the clone). Defines build commands and
                 the PM2 entrypoint.
               </p>
-              {deployerYaml ? (
+              {previaYaml ? (
                 <div className="mt-4">
                   <CodeBlock
-                    title="deployer.yaml"
-                    path={deployerYaml.path}
-                    content={deployerYaml.content}
+                    title="previa.yaml"
+                    path={previaYaml.path}
+                    content={previaYaml.content}
                   />
                 </div>
               ) : null}
             </section>
 
             <section>
-              <h2 className="font-medium text-[#e8eaed]">4. Register the project in deployer</h2>
+              <h2 className="font-medium text-[#e8eaed]">4. Register the project in previa</h2>
               <p className="mt-2">
-                <code className="text-xs">deployer project init</code> detects metadata from your
+                <code className="text-xs">previa project init</code> detects metadata from your
                 repo (Git remote, <code className="text-xs">package.json</code> name, or folder
                 name), asks for anything missing, copies workflow files, then prints a{' '}
                 <strong className="text-[#e8eaed]">registration JSON</strong> between{' '}
@@ -143,7 +143,7 @@ export default function SetupGithubActionsPage() {
               <ol className="mt-2 list-inside list-decimal space-y-1">
                 <li>
                   Copy the JSON block from the terminal (from{' '}
-                  <code className="text-xs">deployer project init</code>)
+                  <code className="text-xs">previa project init</code>)
                 </li>
                 <li>
                   Open <strong className="text-[#e8eaed]">Projects → Add project</strong>
@@ -158,7 +158,7 @@ export default function SetupGithubActionsPage() {
               </ol>
               <div className="mt-4">
                 <CodeBlock
-                  title="Example registration JSON (printed by deployer project init)"
+                  title="Example registration JSON (printed by previa project init)"
                   content={`{
   "slug": "my-app",
   "gitUrl": "https://github.com/org/my-app.git",
@@ -168,16 +168,16 @@ export default function SetupGithubActionsPage() {
               </div>
               <p className="mt-3 text-[#8b919a]">
                 After importing, configure GitHub secrets{' '}
-                <code className="text-xs">DEPLOYER_API_URL</code> and{' '}
-                <code className="text-xs">DEPLOYER_API_KEY</code>. The project slug is written into
-                the workflow files by <code className="text-xs">deployer project init</code>. See{' '}
+                <code className="text-xs">PREVIA_API_URL</code> and{' '}
+                <code className="text-xs">PREVIA_API_KEY</code>. The project slug is written into
+                the workflow files by <code className="text-xs">previa project init</code>. See{' '}
                 <strong className="text-[#b8bcc4]">Setup → Secrets</strong>.
               </p>
               <p className="mt-2 text-[#8b919a]">
-                Non-interactive env vars for <code className="text-xs">deployer project init</code>:{' '}
-                <code className="text-xs">DEPLOYER_PROJECT_SLUG</code>,{' '}
-                <code className="text-xs">DEPLOYER_PROJECT_GIT_URL</code>,{' '}
-                <code className="text-xs">DEPLOYER_PROJECT_SERVER_URL</code> (optional).
+                Non-interactive env vars for <code className="text-xs">previa project init</code>:{' '}
+                <code className="text-xs">PREVIA_PROJECT_SLUG</code>,{' '}
+                <code className="text-xs">PREVIA_PROJECT_GIT_URL</code>,{' '}
+                <code className="text-xs">PREVIA_PROJECT_SERVER_URL</code> (optional).
               </p>
             </section>
 

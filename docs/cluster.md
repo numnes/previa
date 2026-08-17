@@ -1,6 +1,6 @@
 # Cluster (multi-machine)
 
-Run deployer on **machine A** (hub) and **machine B** (spoke) and manage both from A's dashboard.
+Run previa on **machine A** (hub) and **machine B** (spoke) and manage both from A's dashboard.
 
 ## Setup flow
 
@@ -21,16 +21,16 @@ Run deployer on **machine A** (hub) and **machine B** (spoke) and manage both fr
 
 ## How it works
 
-- Hub-and-spoke over HTTP: A calls B's `/cluster/*` endpoints with header `X-Deployer-Cluster-Key`
+- Hub-and-spoke over HTTP: A calls B's `/cluster/*` endpoints with header `X-Previa-Cluster-Key`
 - B enforces the key scope — write actions return `403` on read-only keys even if A tries them
 - Remote instance IDs use the form `r:{nodeId}:{remoteId}` in the hub API
-- Remote node credentials are **encrypted at rest** in A's Postgres with `DEPLOYER_CLUSTER_SECRET` (see [Configuration](configuration.md)); decrypted only when making outbound cluster calls
+- Remote node credentials are **encrypted at rest** in A's Postgres with `PREVIA_CLUSTER_SECRET` (see [Configuration](configuration.md)); decrypted only when making outbound cluster calls
 - Project settings in the hub apply only to **local** projects; remote projects are read-only for configuration
 
 ## Limitations
 
 - Cluster keys on B are stored hashed (like API keys); the plaintext `clu_…` is shown once at creation
 - No automatic health polling — use **Test** on a connected node to refresh status and scope
-- Re-adding a node after rotating `DEPLOYER_CLUSTER_SECRET` requires pasting the cluster key again
+- Re-adding a node after rotating `PREVIA_CLUSTER_SECRET` requires pasting the cluster key again
 
 [← Back to README](../README.md)

@@ -1,19 +1,26 @@
 #!/usr/bin/env bash
-# Installs deployer to ~/deployer and registers the "deployer" CLI in ~/.local/bin
+# Installs previa to ~/previa and registers the "previa" CLI in ~/.local/bin
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/numnes/deployer/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/numnes/previa/main/scripts/install.sh | bash
 #
 # Environment:
-#   DEPLOYER_INSTALL_DIR  clone destination (default: ~/deployer)
-#   DEPLOYER_REPO_URL     git repository (default: https://github.com/numnes/deployer.git)
-#   DEPLOYER_BIN_DIR      where to link the executable (default: ~/.local/bin)
+#   PREVIA_INSTALL_DIR  clone destination (default: ~/previa)
+#   PREVIA_REPO_URL     git repository (default: https://github.com/numnes/previa.git)
+#   PREVIA_BIN_DIR      where to link the executable (default: ~/.local/bin)
 set -euo pipefail
 
-INSTALL_DIR="${DEPLOYER_INSTALL_DIR:-${HOME}/deployer}"
-REPO_URL="${DEPLOYER_REPO_URL:-https://github.com/numnes/deployer.git}"
-BIN_DIR="${DEPLOYER_BIN_DIR:-${HOME}/.local/bin}"
-CONFIG_DIR="${HOME}/.config/deployer"
+INSTALL_DIR="${PREVIA_INSTALL_DIR:-${DEPLOYER_INSTALL_DIR:-}}"
+if [[ -z "$INSTALL_DIR" ]]; then
+  if [[ -d "${HOME}/deployer/.git" && ! -d "${HOME}/previa/.git" ]]; then
+    INSTALL_DIR="${HOME}/deployer"
+  else
+    INSTALL_DIR="${HOME}/previa"
+  fi
+fi
+REPO_URL="${PREVIA_REPO_URL:-${DEPLOYER_REPO_URL:-https://github.com/numnes/previa.git}}"
+BIN_DIR="${PREVIA_BIN_DIR:-${DEPLOYER_BIN_DIR:-${HOME}/.local/bin}}"
+CONFIG_DIR="${HOME}/.config/previa"
 
 log() { echo "[install] $*"; }
 die() { echo "[install] ERROR: $*" >&2; exit 1; }
@@ -38,12 +45,12 @@ else
   git clone "$REPO_URL" "$INSTALL_DIR"
 fi
 
-DEPLOYER_BIN_DIR="$BIN_DIR" bash "${INSTALL_DIR}/scripts/sync-cli.sh"
+PREVIA_BIN_DIR="$BIN_DIR" bash "${INSTALL_DIR}/scripts/sync-cli.sh"
 
 if [[ ! -f "${INSTALL_DIR}/api/.env" ]]; then
   if [[ -f "${INSTALL_DIR}/api/.env.example" ]]; then
     cp "${INSTALL_DIR}/api/.env.example" "${INSTALL_DIR}/api/.env"
-    log "Created api/.env from .env.example (deployer setup will finalize it)"
+    log "Created api/.env from .env.example (previa setup will finalize it)"
   fi
 fi
 
@@ -51,7 +58,7 @@ echo ""
 log "Installation complete."
 echo ""
 echo "  Directory:  ${INSTALL_DIR}"
-echo "  CLI:        deployer"
+echo "  CLI:        previa"
 echo ""
 
 case ":${PATH}:" in
@@ -68,12 +75,12 @@ esac
 
 echo "Next steps:"
 echo ""
-echo "  deployer setup          # start the stack"
-echo "  deployer status         # check services"
-echo "  deployer project init   # wire an app repo (after stack is up)"
-echo "  deployer setup nginx    # print nginx config with locations include"
-echo "  deployer help           # list commands"
+echo "  previa setup          # start the stack"
+echo "  previa status         # check services"
+echo "  previa project init   # wire an app repo (after stack is up)"
+echo "  previa setup nginx    # print nginx config with locations include"
+echo "  previa help           # list commands"
 echo ""
 echo "Before the first app deploy, configure Git access on this machine"
-echo "(SSH deploy key or HTTPS token) — shown at the end of deployer setup."
+echo "(SSH deploy key or HTTPS token) — shown at the end of previa setup."
 echo ""

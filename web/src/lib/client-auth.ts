@@ -6,8 +6,8 @@ export type AuthUser = {
   role: UserRole;
 };
 
-export const TOKEN_KEY = 'deployer_token';
-export const USER_KEY = 'deployer_user';
+export const TOKEN_KEY = 'previa_token';
+export const USER_KEY = 'previa_user';
 
 export function getTokenClient(): string | null {
   if (typeof window === 'undefined') return null;

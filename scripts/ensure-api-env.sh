@@ -7,7 +7,7 @@ ENV_FILE="${ROOT_DIR}/api/.env"
 EXAMPLE_FILE="${ROOT_DIR}/api/.env.example"
 # shellcheck source=lib/public-env.sh
 source "${ROOT_DIR}/scripts/lib/public-env.sh"
-load_deployer_public_env "$ROOT_DIR"
+load_previa_public_env "$ROOT_DIR"
 
 usage() {
   echo "Usage: ensure-api-env.sh --api-port PORT --postgres-port PORT --redis-port PORT --web-port PORT" >&2
@@ -74,7 +74,10 @@ fi
 
 # Chave usada pelo processo de setup (na máquina root) para autenticar em
 # endpoints privilegiados (register / listar usuários) sem expô-los publicamente.
-setup_key="$(get_env_var DEPLOYER_SETUP_KEY || true)"
+setup_key="$(get_env_var PREVIA_SETUP_KEY || true)"
+if [[ -z "$setup_key" ]]; then
+  setup_key="$(get_env_var DEPLOYER_SETUP_KEY || true)"
+fi
 if [[ -z "$setup_key" ]]; then
   setup_key="$(generate_jwt_secret)"
 fi
@@ -82,29 +85,43 @@ fi
 # Chave local usada para criptografar credenciais de nós remotos no Postgres.
 # Deve permanecer estável entre restarts; se trocar, nós conectados antigos
 # precisam ser recadastrados.
-cluster_secret="$(get_env_var DEPLOYER_CLUSTER_SECRET || true)"
+cluster_secret="$(get_env_var PREVIA_CLUSTER_SECRET || true)"
+if [[ -z "$cluster_secret" ]]; then
+  cluster_secret="$(get_env_var DEPLOYER_CLUSTER_SECRET || true)"
+fi
 if [[ -z "$cluster_secret" ]]; then
   cluster_secret="$(generate_jwt_secret)"
 fi
 
-work_root="${HOME}/.local/share/deployer"
+work_root="$(get_env_var PREVIA_WORK_ROOT || true)"
+if [[ -z "$work_root" ]]; then
+  work_root="$(get_env_var DEPLOYER_WORK_ROOT || true)"
+fi
+if [[ -z "$work_root" ]]; then
+  if [[ -d "${HOME}/.local/share/deployer" && ! -d "${HOME}/.local/share/previa" ]]; then
+    work_root="${HOME}/.local/share/deployer"
+  else
+    work_root="${HOME}/.local/share/previa"
+  fi
+fi
 core_dir="${ROOT_DIR}/core"
 
 set_env_var PORT "$API_PORT"
+# Nome interno do banco permanece `deployer` para volumes Postgres já existentes.
 set_env_var DATABASE_URL "postgresql://postgres:deployer@localhost:${POSTGRES_PORT}/deployer"
 set_env_var TYPEORM_SYNC "true"
 set_env_var JWT_SECRET "$jwt"
 set_env_var REDIS_HOST "127.0.0.1"
 set_env_var REDIS_PORT "$REDIS_PORT"
-set_env_var DEPLOYER_WORK_ROOT "$work_root"
-set_env_var DEPLOYER_CORE_DIR "$core_dir"
-set_env_var DEPLOYER_SETUP_KEY "$setup_key"
-set_env_var DEPLOYER_CLUSTER_SECRET "$cluster_secret"
+set_env_var PREVIA_WORK_ROOT "$work_root"
+set_env_var PREVIA_CORE_DIR "$core_dir"
+set_env_var PREVIA_SETUP_KEY "$setup_key"
+set_env_var PREVIA_CLUSTER_SECRET "$cluster_secret"
 
-# CORS: prefer deployer.env; else keep a non-local value already in api/.env; else localhost.
+# CORS: prefer previa.env; else keep a non-local value already in api/.env; else localhost.
 existing_cors="$(get_env_var CORS_ORIGIN || true)"
-if [[ -n "${DEPLOYER_PUBLIC_WEB_URL:-}" ]]; then
-  cors_origin="${DEPLOYER_PUBLIC_WEB_URL%/}"
+if [[ -n "${PREVIA_PUBLIC_WEB_URL:-}" ]]; then
+  cors_origin="${PREVIA_PUBLIC_WEB_URL%/}"
 elif [[ -n "$existing_cors" ]] && ! is_local_dev_url "$existing_cors"; then
   cors_origin="$existing_cors"
 else
@@ -113,11 +130,11 @@ fi
 set_env_var CORS_ORIGIN "$cors_origin"
 
 # Parallel deploy jobs (BullMQ worker concurrency). Default 3 if unset/invalid.
-concurrency_raw="${DEPLOYER_DEPLOY_CONCURRENCY:-}"
+concurrency_raw="${PREVIA_DEPLOY_CONCURRENCY:-}"
 if [[ -n "$concurrency_raw" ]]; then
-  set_env_var DEPLOYER_DEPLOY_CONCURRENCY "$concurrency_raw"
-elif [[ -z "$(get_env_var DEPLOYER_DEPLOY_CONCURRENCY || true)" ]]; then
-  set_env_var DEPLOYER_DEPLOY_CONCURRENCY "3"
+  set_env_var PREVIA_DEPLOY_CONCURRENCY "$concurrency_raw"
+elif [[ -z "$(get_env_var PREVIA_DEPLOY_CONCURRENCY || true)" ]]; then
+  set_env_var PREVIA_DEPLOY_CONCURRENCY "3"
 fi
 
 echo "[ensure-env] api/.env updated (API :${API_PORT}, Postgres :${POSTGRES_PORT}, Redis :${REDIS_PORT}, Web :${WEB_PORT}, CORS :${cors_origin})"

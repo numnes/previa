@@ -1,9 +1,9 @@
-/** Parallel BullMQ deploy jobs. Override via DEPLOYER_DEPLOY_CONCURRENCY. */
+/** Parallel BullMQ deploy jobs. Override via PREVIA_DEPLOY_CONCURRENCY. */
 export const DEFAULT_DEPLOY_CONCURRENCY = 3;
 export const MAX_DEPLOY_CONCURRENCY = 32;
 
 export function resolveDeployConcurrency(
-  raw: string | undefined | null = process.env.DEPLOYER_DEPLOY_CONCURRENCY,
+  raw: string | undefined | null = process.env.PREVIA_DEPLOY_CONCURRENCY,
 ): number {
   const trimmed = raw?.trim();
   if (!trimmed) return DEFAULT_DEPLOY_CONCURRENCY;

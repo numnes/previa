@@ -18,7 +18,10 @@ export class JwtOrSetupKeyGuard extends AuthGuard('jwt') {
     const req = context.switchToHttp().getRequest<{
       headers: Record<string, string | string[] | undefined>;
     }>();
-    const expected = this.config.get<string>('DEPLOYER_SETUP_KEY') ?? '';
+    const expected =
+      this.config.get<string>('PREVIA_SETUP_KEY') ??
+      this.config.get<string>('DEPLOYER_SETUP_KEY') ??
+      '';
     const provided = extractSetupKey(req.headers);
     if (isValidSetupKey(provided, expected)) {
       return true;

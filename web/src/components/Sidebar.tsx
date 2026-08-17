@@ -20,9 +20,9 @@ import { clearTokenClient } from "@/lib/client-auth";
 import { useAuth } from "@/components/AuthProvider";
 import { isAdmin } from "@/lib/client-auth";
 import { isDemoMode } from "@/demo/mode";
-import { deployerVersionLabel } from "@/lib/version";
+import { previaVersionLabel } from "@/lib/version";
 
-const SIDEBAR_OPEN_KEY = "deployer-sidebar-open";
+const SIDEBAR_OPEN_KEY = "previa-sidebar-open";
 
 function readOpenState(): Record<string, boolean> {
   if (typeof window === "undefined") return {};
@@ -242,7 +242,7 @@ export function Sidebar() {
       <div className="border-b border-[#3d4048] px-4 py-4">
         <Link href="/" className="block">
           <div className="text-sm font-semibold tracking-wide text-[#e8eaed]">
-            deployer
+            Previa
           </div>
           <div className="text-xs text-[#8b919a]">preview environments</div>
         </Link>
@@ -271,9 +271,9 @@ export function Sidebar() {
         </button>
         <p
           className="mt-1 px-3 pb-1 text-[10px] tabular-nums tracking-wide text-[#6b7280]"
-          title="Deployer build version"
+          title="Previa build version"
         >
-          {deployerVersionLabel()}
+          {previaVersionLabel()}
         </p>
       </div>
     </aside>

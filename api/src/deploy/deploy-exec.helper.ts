@@ -33,19 +33,19 @@ export async function runCoreDeployScript(
   appEnv?: DeployAppEnvInput,
 ): Promise<DeployMeta> {
   const coreDir =
-    config.get<string>('DEPLOYER_CORE_DIR') ||
+    config.get<string>('PREVIA_CORE_DIR') ||
     join(__dirname, '..', '..', '..', 'core');
-  const workRoot = config.get<string>('DEPLOYER_WORK_ROOT');
+  const workRoot = config.get<string>('PREVIA_WORK_ROOT');
   if (!workRoot) {
-    throw new Error('DEPLOYER_WORK_ROOT não configurado');
+    throw new Error('PREVIA_WORK_ROOT não configurado');
   }
   const binDir = join(coreDir, 'bin');
-  const env: NodeJS.ProcessEnv = { ...process.env, DEPLOYER_WORK_ROOT: workRoot };
+  const env: NodeJS.ProcessEnv = { ...process.env, PREVIA_WORK_ROOT: workRoot };
   if (image) {
-    env.DEPLOYER_IMAGE = image;
+    env.PREVIA_IMAGE = image;
   }
 
-  env.DEPLOYER_PORT_ENV_NAMES = resolvePortEnvNames(appEnv?.portEnvNames).join(
+  env.PREVIA_PORT_ENV_NAMES = resolvePortEnvNames(appEnv?.portEnvNames).join(
     ',',
   );
 
@@ -57,10 +57,10 @@ export async function runCoreDeployScript(
   if (Object.keys(merged).length > 0) {
     envFilePath = join(
       tmpdir(),
-      `deployer-app-env-${randomBytes(8).toString('hex')}.env`,
+      `previa-app-env-${randomBytes(8).toString('hex')}.env`,
     );
     await writeFile(envFilePath, envVarsToDotenv(merged), 'utf8');
-    env.DEPLOYER_APP_ENV_FILE = envFilePath;
+    env.PREVIA_APP_ENV_FILE = envFilePath;
   }
 
   const script = join(binDir, 'deploy.sh');
@@ -76,7 +76,7 @@ export async function runCoreDeployScript(
   }
 
   const pm2Name = pm2AppName(projectSlug, branch);
-  const metaPath = join(workRoot, '.deployer-state', `${pm2Name}.deploy-result.json`);
+  const metaPath = join(workRoot, '.previa-state', `${pm2Name}.deploy-result.json`);
   const raw = await readFile(metaPath, 'utf8');
   const meta = JSON.parse(raw) as DeployMeta;
   await unlink(metaPath).catch(() => undefined);
@@ -89,28 +89,28 @@ export async function runCorePauseScript(
   branch: string,
 ): Promise<void> {
   const coreDir =
-    config.get<string>('DEPLOYER_CORE_DIR') ||
+    config.get<string>('PREVIA_CORE_DIR') ||
     join(__dirname, '..', '..', '..', 'core');
-  const workRoot = config.get<string>('DEPLOYER_WORK_ROOT');
+  const workRoot = config.get<string>('PREVIA_WORK_ROOT');
   if (!workRoot) {
-    throw new Error('DEPLOYER_WORK_ROOT não configurado');
+    throw new Error('PREVIA_WORK_ROOT não configurado');
   }
   const binDir = join(coreDir, 'bin');
-  const env = { ...process.env, DEPLOYER_WORK_ROOT: workRoot };
+  const env = { ...process.env, PREVIA_WORK_ROOT: workRoot };
   const script = join(binDir, 'pause.sh');
   await execFileAsync(script, [projectSlug, branch], { env });
 }
 
 function coreEnv(config: ConfigService): NodeJS.ProcessEnv {
-  const workRoot = config.get<string>('DEPLOYER_WORK_ROOT');
+  const workRoot = config.get<string>('PREVIA_WORK_ROOT');
   if (!workRoot) {
-    throw new Error('DEPLOYER_WORK_ROOT não configurado');
+    throw new Error('PREVIA_WORK_ROOT não configurado');
   }
   const apiPort = process.env.PORT || '3000';
   return {
     ...process.env,
-    DEPLOYER_WORK_ROOT: workRoot,
-    DEPLOYER_WAKE_UPSTREAM: `http://127.0.0.1:${apiPort}`,
+    PREVIA_WORK_ROOT: workRoot,
+    PREVIA_WAKE_UPSTREAM: `http://127.0.0.1:${apiPort}`,
   };
 }
 
@@ -120,7 +120,7 @@ export async function runCoreSleepScript(
   branch: string,
 ): Promise<void> {
   const coreDir =
-    config.get<string>('DEPLOYER_CORE_DIR') ||
+    config.get<string>('PREVIA_CORE_DIR') ||
     join(__dirname, '..', '..', '..', 'core');
   const binDir = join(coreDir, 'bin');
   const script = join(binDir, 'sleep.sh');
@@ -137,16 +137,16 @@ export async function runCoreResumeScript(
   appEnv?: DeployAppEnvInput,
 ): Promise<DeployMeta> {
   const coreDir =
-    config.get<string>('DEPLOYER_CORE_DIR') ||
+    config.get<string>('PREVIA_CORE_DIR') ||
     join(__dirname, '..', '..', '..', 'core');
-  const workRoot = config.get<string>('DEPLOYER_WORK_ROOT');
+  const workRoot = config.get<string>('PREVIA_WORK_ROOT');
   if (!workRoot) {
-    throw new Error('DEPLOYER_WORK_ROOT não configurado');
+    throw new Error('PREVIA_WORK_ROOT não configurado');
   }
   const binDir = join(coreDir, 'bin');
   const env: NodeJS.ProcessEnv = {
     ...coreEnv(config),
-    DEPLOYER_PORT_ENV_NAMES: resolvePortEnvNames(appEnv?.portEnvNames).join(','),
+    PREVIA_PORT_ENV_NAMES: resolvePortEnvNames(appEnv?.portEnvNames).join(','),
   };
 
   const merged = mergeEnvVars(
@@ -157,10 +157,10 @@ export async function runCoreResumeScript(
   if (Object.keys(merged).length > 0) {
     envFilePath = join(
       tmpdir(),
-      `deployer-app-env-${randomBytes(8).toString('hex')}.env`,
+      `previa-app-env-${randomBytes(8).toString('hex')}.env`,
     );
     await writeFile(envFilePath, envVarsToDotenv(merged), 'utf8');
-    env.DEPLOYER_APP_ENV_FILE = envFilePath;
+    env.PREVIA_APP_ENV_FILE = envFilePath;
   }
 
   const script = join(binDir, 'resume.sh');
@@ -176,7 +176,7 @@ export async function runCoreResumeScript(
   }
 
   const pm2Name = pm2AppName(projectSlug, branch);
-  const metaPath = join(workRoot, '.deployer-state', `${pm2Name}.deploy-result.json`);
+  const metaPath = join(workRoot, '.previa-state', `${pm2Name}.deploy-result.json`);
   const raw = await readFile(metaPath, 'utf8');
   const meta = JSON.parse(raw) as DeployMeta;
   await unlink(metaPath).catch(() => undefined);

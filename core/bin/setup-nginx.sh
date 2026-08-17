@@ -15,12 +15,12 @@ usage() {
 
 DOMAIN="$1"
 
-LOC_REL="${DEPLOYER_LOCATIONS_DIR}"
+LOC_REL="${PREVIA_LOCATIONS_DIR}"
 mkdir -p "$LOC_REL"
 
 SNIPPET_PATH="${LOC_REL}/nginx-server-snippet.conf"
 cat >"$SNIPPET_PATH" <<EOF
-# Gerado pelo deployer core — inclua este server {} em sites-available ou importe o arquivo.
+# Gerado pelo previa core — inclua este server {} em sites-available ou importe o arquivo.
 server {
     server_name ${DOMAIN};
 

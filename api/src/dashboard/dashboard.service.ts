@@ -134,10 +134,10 @@ export class DashboardService {
   }
 
   private diskRootPath(): string {
-    // Prefer medir o disco que contém o DEPLOYER_WORK_ROOT (é onde ficam os checkouts/builds).
+    // Prefer medir o disco que contém o PREVIA_WORK_ROOT (é onde ficam os checkouts/builds).
     // Para df funcionar de forma consistente, usamos o diretório como alvo.
     try {
-      const workRoot = process.env.DEPLOYER_WORK_ROOT;
+      const workRoot = process.env.PREVIA_WORK_ROOT || process.env.DEPLOYER_WORK_ROOT;
       if (workRoot && workRoot.trim()) return workRoot.trim();
     } catch {
       /* ignore */

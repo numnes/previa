@@ -36,7 +36,7 @@ function LoginForm() {
     <div className="flex min-h-screen items-center justify-center bg-[#2b2e33] p-6">
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
-          <div className="text-lg font-semibold text-[#e8eaed]">deployer</div>
+          <div className="text-lg font-semibold text-[#e8eaed]">Previa</div>
           <div className="text-xs text-[#8b919a]">preview environments</div>
         </div>
         <div className="card p-5">

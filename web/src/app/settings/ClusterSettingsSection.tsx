@@ -56,7 +56,7 @@ export function ClusterSettingsSection() {
       <section>
         <h2 className="text-sm font-medium text-[#e8eaed]">Cluster credentials (this node)</h2>
         <p className="mt-1 text-xs text-[#8b919a]">
-          Generate a key on this machine and paste it into another deployer&apos;s connected nodes
+          Generate a key on this machine and paste it into another previa&apos;s connected nodes
           settings. Choose <strong>Read-only</strong> (dashboard, projects, instances and logs) or{' '}
           <strong>Read &amp; write</strong> (also allows pausing, activating and removing instances
           from the remote panel).
@@ -159,7 +159,7 @@ export function ClusterSettingsSection() {
       <section className="border-t border-[#3d4048] pt-6">
         <h2 className="text-sm font-medium text-[#e8eaed]">Connected nodes</h2>
         <p className="mt-1 text-xs text-[#8b919a]">
-          Add other deployer machines to aggregate their dashboard, projects, and instances in this
+          Add other previa machines to aggregate their dashboard, projects, and instances in this
           panel.
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">

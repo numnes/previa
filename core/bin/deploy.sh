@@ -3,8 +3,8 @@
 #   deploy.sh <slug-projeto> <url-git> <branch>
 #   deploy.sh --resume <slug-projeto> <branch>   # sobe PM2 sem clone/build (wake)
 # Env opcional:
-#   DEPLOYER_IMAGE=<registry/image:tag> (modo docker remoto)
-#   DEPLOYER_APP_ENV_FILE=<path> (.env do dashboard: projeto + override da instância)
+#   PREVIA_IMAGE=<registry/image:tag> (modo docker remoto)
+#   PREVIA_APP_ENV_FILE=<path> (.env do dashboard: projeto + override da instância)
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/common.sh
@@ -37,8 +37,8 @@ fi
 BRANCH_SLUG="$(sanitize_branch_slug "$BRANCH")"
 LOCATION_BASENAME="$(location_file_basename "$PROJECT_SLUG" "$BRANCH_SLUG")"
 
-TARGET_DIR="${DEPLOYER_WORK_ROOT}/${PROJECT_SLUG}/${BRANCH_SLUG}"
-LOCATIONS_DIR="${DEPLOYER_LOCATIONS_DIR}"
+TARGET_DIR="${PREVIA_WORK_ROOT}/${PROJECT_SLUG}/${BRANCH_SLUG}"
+LOCATIONS_DIR="${PREVIA_LOCATIONS_DIR}"
 NAME="$(instance_name "$PROJECT_SLUG" "$BRANCH")"
 MERGED_ENV_FILE=""
 
@@ -69,7 +69,7 @@ clone_or_update_repo() {
 write_deploy_meta() {
   local runner="$1"
   local port="$2"
-  local result_json="${DEPLOYER_STATE_DIR}/${NAME}.deploy-result.json"
+  local result_json="${PREVIA_STATE_DIR}/${NAME}.deploy-result.json"
   export _D_META_PROJECT="$PROJECT_SLUG"
   export _D_META_BRANCH="$BRANCH"
   export _D_META_BRANCH_SLUG="$BRANCH_SLUG"
@@ -105,7 +105,7 @@ pm2_start_with_env() {
   local env_file="$3"
   local app_cwd="${4:-}"
   local eco_dir eco
-  eco_dir="$(mktemp -d "${DEPLOYER_STATE_DIR}/eco.XXXXXX")"
+  eco_dir="$(mktemp -d "${PREVIA_STATE_DIR}/eco.XXXXXX")"
   eco="${eco_dir}/ecosystem.config.js"
   export _D_ECO_OUT="$eco"
   export _D_ECO_NAME="$NAME"
@@ -113,7 +113,7 @@ pm2_start_with_env() {
   export _D_ECO_PORT="$port"
   export _D_ECO_ENV="$env_file"
   export _D_ECO_CWD="$app_cwd"
-  export _D_ECO_PORT_ENV_NAMES="${DEPLOYER_PORT_ENV_NAMES:-PORT,SERVER_PORT,APP_PORT}"
+  export _D_ECO_PORT_ENV_NAMES="${PREVIA_PORT_ENV_NAMES:-PORT,SERVER_PORT,APP_PORT}"
   python3 <<'PY'
 import json, os, re
 
@@ -152,10 +152,10 @@ cwd = (os.environ.get("_D_ECO_CWD") or "").strip()
 # .env no checkout (ex.: cp .env.dev .env no build) — base para o processo
 if cwd:
     load_dotenv(os.path.join(cwd, ".env"), env)
-# Merge do dashboard / deployer.yaml env: (vence o .env do disco)
+# Merge do dashboard / previa.yaml env: (vence o .env do disco)
 load_dotenv(os.environ.get("_D_ECO_ENV") or "", env)
-# PORT do deployer sempre vence (nginx location aponta para ela).
-# Nomes: DEPLOYER_PORT_ENV_NAMES (defaults PORT,SERVER_PORT,APP_PORT + extras do projeto/yaml).
+# PORT do previa sempre vence (nginx location aponta para ela).
+# Nomes: PREVIA_PORT_ENV_NAMES (defaults PORT,SERVER_PORT,APP_PORT + extras do projeto/yaml).
 port = os.environ["_D_ECO_PORT"]
 names_raw = (os.environ.get("_D_ECO_PORT_ENV_NAMES") or "").strip()
 names = [n.strip() for n in names_raw.split(",") if n.strip()]
@@ -221,7 +221,7 @@ deploy_pm2() {
   # Se a porta reservada ainda estiver ocupada (órfão / roubo legado), realoca.
   if is_port_listening "$PORT"; then
     log "[deploy] porta ${PORT} ainda em uso após stop — realocando"
-    rm -f "${DEPLOYER_STATE_DIR}/${NAME}.port"
+    rm -f "${PREVIA_STATE_DIR}/${NAME}.port"
     PORT="$(reserve_free_port "$NAME")"
     export PORT
   fi
@@ -230,7 +230,7 @@ deploy_pm2() {
   if [[ "$RESUME_ONLY" -eq 0 ]]; then
     (
       cd "$TARGET_DIR"
-      # Envs do dashboard / deployer.yaml disponíveis também no build.
+      # Envs do dashboard / previa.yaml disponíveis também no build.
       if [[ -n "$MERGED_ENV_FILE" && -s "$MERGED_ENV_FILE" ]]; then
         # shellcheck disable=SC1090
         eval "$(exports_from_dotenv_file "$MERGED_ENV_FILE")"
@@ -257,7 +257,7 @@ deploy_pm2() {
     exit 1
   fi
 
-  # Após a seção de comandos (build) do deployer.yaml: aplica envs no start PM2.
+  # Após a seção de comandos (build) do previa.yaml: aplica envs no start PM2.
   pm2_start_with_env "$abs_target" "$PORT" "$MERGED_ENV_FILE" "$TARGET_DIR"
 
   write_location_file "$LOCATIONS_DIR" "$PROJECT_SLUG" "$BRANCH_SLUG" "$PORT"
@@ -277,7 +277,7 @@ deploy_docker() {
   local container_port="$4"
   local image_name_base="$5"
 
-  if [[ "$docker_build_mode" == "remote" && -z "${DEPLOYER_IMAGE:-}" ]]; then
+  if [[ "$docker_build_mode" == "remote" && -z "${PREVIA_IMAGE:-}" ]]; then
     echo "Runner docker com build remote exige o campo 'image' no trigger de deploy." >&2
     exit 1
   fi
@@ -288,10 +288,10 @@ deploy_docker() {
   fi
 
   local image_to_run=""
-  if [[ -n "${DEPLOYER_IMAGE:-}" ]]; then
-    log "[deploy] pulling image ${DEPLOYER_IMAGE}"
-    docker pull "$DEPLOYER_IMAGE"
-    image_to_run="$DEPLOYER_IMAGE"
+  if [[ -n "${PREVIA_IMAGE:-}" ]]; then
+    log "[deploy] pulling image ${PREVIA_IMAGE}"
+    docker pull "$PREVIA_IMAGE"
+    image_to_run="$PREVIA_IMAGE"
   else
     clone_or_update_repo
     local dockerfile_path="${TARGET_DIR}/${dockerfile_rel}"
@@ -311,7 +311,7 @@ deploy_docker() {
   stop_instance "$NAME"
   if is_port_listening "$host_port"; then
     log "[deploy] porta ${host_port} ainda em uso após stop — realocando"
-    rm -f "${DEPLOYER_STATE_DIR}/${NAME}.port"
+    rm -f "${PREVIA_STATE_DIR}/${NAME}.port"
     host_port="$(reserve_free_port "$NAME")"
   fi
   write_instance_runner "$NAME" "docker"
@@ -334,7 +334,7 @@ deploy_docker() {
   log "OK deploy ${PROJECT_SLUG} branch ${BRANCH} -> porta ${host_port} docker:${NAME}"
 }
 
-# Sempre clona/atualiza para ler deployer.yaml (e para build local), exceto no wake.
+# Sempre clona/atualiza para ler previa.yaml (e para build local), exceto no wake.
 if [[ "$RESUME_ONLY" -eq 1 ]]; then
   if [[ ! -d "$TARGET_DIR" ]]; then
     echo "Resume falhou: checkout ausente em ${TARGET_DIR}" >&2
@@ -344,7 +344,7 @@ else
   clone_or_update_repo
 fi
 
-mapfile -t _parsed < <(parse_deployer_yaml "$TARGET_DIR")
+mapfile -t _parsed < <(parse_previa_yaml "$TARGET_DIR")
 RUNNER="${_parsed[0]}"
 
 if [[ "$RESUME_ONLY" -eq 1 && "$RUNNER" != "pm2" ]]; then
@@ -362,11 +362,11 @@ for line in "${_parsed[@]}"; do
   fi
 done
 
-# Une defaults + API (projeto) + deployer.yaml
+# Une defaults + API (projeto) + previa.yaml
 DEFAULTS='PORT,SERVER_PORT,APP_PORT' \
-FROM_API="${DEPLOYER_PORT_ENV_NAMES:-}" \
+FROM_API="${PREVIA_PORT_ENV_NAMES:-}" \
 FROM_YAML="$(printf '%s\n' "${YAML_PORT_ENV_NAMES[@]}")" \
-DEPLOYER_PORT_ENV_NAMES="$(
+PREVIA_PORT_ENV_NAMES="$(
   python3 -c '
 import os, re
 KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -385,9 +385,9 @@ for a in (os.environ.get("FROM_YAML") or "").splitlines():
 print(",".join(out))
 '
 )"
-export DEPLOYER_PORT_ENV_NAMES
+export PREVIA_PORT_ENV_NAMES
 
-MERGED_ENV_FILE="$(mktemp "${DEPLOYER_STATE_DIR}/${NAME}.env.XXXXXX")"
+MERGED_ENV_FILE="$(mktemp "${PREVIA_STATE_DIR}/${NAME}.env.XXXXXX")"
 merge_app_env_file "$MERGED_ENV_FILE" "${YAML_ENV_LINES[@]}"
 
 if [[ "$RUNNER" == "pm2" ]]; then

@@ -1,6 +1,6 @@
 # Coloque na raiz do repositório da aplicação (mesmo nível do clone).
 # runner: pm2 | docker
-# Use `deployer project init` para gerar o arquivo adequado ao seu stack.
+# Use `previa project init` para gerar o arquivo adequado ao seu stack.
 runner: pm2
 
 build:

@@ -17,7 +17,7 @@ import {
   type WithNode,
 } from './cluster.types';
 
-const CLUSTER_HEADER = 'x-deployer-cluster-key';
+const CLUSTER_HEADER = 'x-previa-cluster-key';
 const FETCH_TIMEOUT_MS = 12_000;
 
 @Injectable()
@@ -44,6 +44,7 @@ export class ClusterAggregatorService {
       method: init?.method ?? 'GET',
       headers: {
         [CLUSTER_HEADER]: apiKey,
+        'x-deployer-cluster-key': apiKey,
         ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
       },
       body: hasBody ? JSON.stringify(init?.body) : undefined,

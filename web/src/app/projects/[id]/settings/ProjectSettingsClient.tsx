@@ -476,7 +476,7 @@ export default function ProjectSettingsClient() {
                       <span className="font-mono">--env-file</span>). Instance overrides can replace
                       individual keys. Also merges over optional{' '}
                       <span className="font-mono">env:</span> in{' '}
-                      <span className="font-mono">deployer.yaml</span>.
+                      <span className="font-mono">previa.yaml</span>.
                     </p>
                     <div className="mt-4">
                       <EnvEditor

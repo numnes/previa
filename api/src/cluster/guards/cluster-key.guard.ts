@@ -8,6 +8,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { ClusterKeysService } from '../../cluster-keys/cluster-keys.service';
 import { CLUSTER_WRITE_KEY } from './cluster-write.decorator';
+import { headerValue } from '../../http/header-value';
 
 type ClusterRequest = {
   headers: Record<string, string | string[] | undefined>;
@@ -23,10 +24,13 @@ export class ClusterKeyGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<ClusterRequest>();
-    const raw = req.headers['x-deployer-cluster-key'];
-    const key = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : '';
+    const key = headerValue(
+      req.headers,
+      'x-previa-cluster-key',
+      'x-deployer-cluster-key',
+    );
     if (!key) {
-      throw new UnauthorizedException('Cabeçalho X-Deployer-Cluster-Key obrigatório');
+      throw new UnauthorizedException('Cabeçalho X-Previa-Cluster-Key obrigatório');
     }
     const row = await this.keys.resolveKey(key);
     if (!row) {

@@ -59,7 +59,7 @@ export async function fetchPm2ByName(
   config: ConfigService,
 ): Promise<Map<string, { status: string | null; monit?: Pm2Monit }>> {
   const coreDir =
-    config.get<string>('DEPLOYER_CORE_DIR') ||
+    config.get<string>('PREVIA_CORE_DIR') ||
     join(__dirname, '..', '..', '..', 'core');
   const script = join(coreDir, 'bin', 'list-instances.sh');
   let rows: Pm2Row[] = [];

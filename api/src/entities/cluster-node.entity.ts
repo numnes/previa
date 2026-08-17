@@ -18,7 +18,7 @@ export class ClusterNode {
   @Column({ name: 'base_url' })
   baseUrl: string;
 
-  /** Chave cluster remota criptografada com DEPLOYER_CLUSTER_SECRET. */
+  /** Chave cluster remota criptografada com PREVIA_CLUSTER_SECRET. */
   @Column({ name: 'api_key' })
   apiKey: string;
 

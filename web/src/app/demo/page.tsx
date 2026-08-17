@@ -16,7 +16,7 @@ export default function DemoLandingPage() {
     <div className="flex min-h-screen items-center justify-center bg-[#2b2e33] p-6">
       <div className="w-full max-w-lg">
         <div className="mb-6 text-center">
-          <div className="text-lg font-semibold text-[#e8eaed]">deployer</div>
+          <div className="text-lg font-semibold text-[#e8eaed]">Previa</div>
           <div className="text-xs text-[#8b919a]">interactive demo</div>
         </div>
         <div className="card space-y-4 p-6">

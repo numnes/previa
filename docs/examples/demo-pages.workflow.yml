@@ -37,7 +37,7 @@ jobs:
           # Project Pages URL: https://<user>.github.io/<repo>/
           NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
         run: |
-          export NEXT_PUBLIC_DEPLOYER_VERSION="$(git describe --tags --always 2>/dev/null || echo demo)"
+          export NEXT_PUBLIC_PREVIA_VERSION="$(git describe --tags --always 2>/dev/null || echo demo)"
           npm ci
           npm run build:demo
       - uses: actions/upload-pages-artifact@v3

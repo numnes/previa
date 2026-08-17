@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
-# Copy GitHub Actions workflows and deployer.yaml into an application repository.
+# Copy GitHub Actions workflows and previa.yaml into an application repository.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=lib/github-credentials-hint.sh
 source "${ROOT_DIR}/scripts/lib/github-credentials-hint.sh"
+
+: "${PREVIA_PROJECT_SLUG:=${DEPLOYER_PROJECT_SLUG:-}}"
+: "${PREVIA_PROJECT_GIT_URL:=${DEPLOYER_PROJECT_GIT_URL:-}}"
+: "${PREVIA_PROJECT_SERVER_URL:=${DEPLOYER_PROJECT_SERVER_URL:-}}"
+: "${PREVIA_RUNNER:=${DEPLOYER_RUNNER:-}}"
+: "${PREVIA_DOCKER_BUILD:=${DEPLOYER_DOCKER_BUILD:-}}"
+: "${PREVIA_REGISTRY:=${DEPLOYER_REGISTRY:-}}"
 
 TARGET_DIR=""
 FORCE=0
@@ -12,9 +19,9 @@ BRANCHES="master,homologation"
 
 usage() {
   cat <<EOF
-Usage: deployer project init [PATH] [options]
+Usage: previa project init [PATH] [options]
 
-Copy preview workflows and deployer.yaml into an application repo.
+Copy preview workflows and previa.yaml into an application repo.
 
   PATH              Target directory (default: current directory)
 
@@ -24,18 +31,18 @@ Options:
   -h, --help        Show this help
 
 Environment (non-interactive):
-  DEPLOYER_PROJECT_SLUG       Project slug
-  DEPLOYER_PROJECT_GIT_URL    Git remote URL
-  DEPLOYER_PROJECT_SERVER_URL Optional public URL (nginx domain)
-  DEPLOYER_RUNNER             pm2 | docker
-  DEPLOYER_DOCKER_BUILD       local | remote (when runner=docker)
-  DEPLOYER_REGISTRY           Container registry host (default: ghcr.io)
+  PREVIA_PROJECT_SLUG       Project slug
+  PREVIA_PROJECT_GIT_URL    Git remote URL
+  PREVIA_PROJECT_SERVER_URL Optional public URL (nginx domain)
+  PREVIA_RUNNER             pm2 | docker
+  PREVIA_DOCKER_BUILD       local | remote (when runner=docker)
+  PREVIA_REGISTRY           Container registry host (default: ghcr.io)
 
 Examples:
-  deployer project init
-  deployer project init ../my-app
-  deployer project init --branches main,develop
-  deployer project init --force
+  previa project init
+  previa project init ../my-app
+  previa project init --branches main,develop
+  previa project init --force
 EOF
 }
 
@@ -74,13 +81,13 @@ collect_project_metadata() {
   git_source="$(DETECTED="$detected_json" node -e 'const d=JSON.parse(process.env.DETECTED);process.stdout.write(d.sources?.gitUrl||"")')"
 
   echo ""
-  log "Project registration (for deployer dashboard)"
+  log "Project registration (for previa dashboard)"
   [[ -n "$slug_source" ]] && echo "  slug hint: ${slug_source}"
   [[ -n "$git_source" ]] && echo "  git URL hint: ${git_source}"
 
-  if [[ -n "${DEPLOYER_PROJECT_SLUG:-}" ]]; then
-    PROJECT_SLUG="$DEPLOYER_PROJECT_SLUG"
-    echo "  slug: ${PROJECT_SLUG} (DEPLOYER_PROJECT_SLUG)"
+  if [[ -n "${PREVIA_PROJECT_SLUG:-}" ]]; then
+    PROJECT_SLUG="$PREVIA_PROJECT_SLUG"
+    echo "  slug: ${PROJECT_SLUG} (PREVIA_PROJECT_SLUG)"
   else
     while true; do
       PROJECT_SLUG="$(prompt_with_default "Slug" "$default_slug")"
@@ -91,9 +98,9 @@ collect_project_metadata() {
     done
   fi
 
-  if [[ -n "${DEPLOYER_PROJECT_GIT_URL:-}" ]]; then
-    PROJECT_GIT_URL="$DEPLOYER_PROJECT_GIT_URL"
-    echo "  git URL: ${PROJECT_GIT_URL} (DEPLOYER_PROJECT_GIT_URL)"
+  if [[ -n "${PREVIA_PROJECT_GIT_URL:-}" ]]; then
+    PROJECT_GIT_URL="$PREVIA_PROJECT_GIT_URL"
+    echo "  git URL: ${PROJECT_GIT_URL} (PREVIA_PROJECT_GIT_URL)"
   else
     while true; do
       PROJECT_GIT_URL="$(prompt_with_default "Git URL" "$default_git")"
@@ -102,8 +109,8 @@ collect_project_metadata() {
     done
   fi
 
-  if [[ -n "${DEPLOYER_PROJECT_SERVER_URL:-}" ]]; then
-    PROJECT_SERVER_URL="$DEPLOYER_PROJECT_SERVER_URL"
+  if [[ -n "${PREVIA_PROJECT_SERVER_URL:-}" ]]; then
+    PROJECT_SERVER_URL="$PREVIA_PROJECT_SERVER_URL"
   else
     echo ""
     echo "  Public URL: the public domain configured in nginx where preview instances"
@@ -115,7 +122,7 @@ collect_project_metadata() {
 
 derive_registry_image() {
   local git_url="$1"
-  REGISTRY="${DEPLOYER_REGISTRY:-ghcr.io}"
+  REGISTRY="${PREVIA_REGISTRY:-ghcr.io}"
   if [[ "$git_url" =~ github\.com[:/]+([^/]+)/([^/.]+) ]]; then
     local owner="${BASH_REMATCH[1]}"
     local repo
@@ -132,9 +139,9 @@ collect_runner_config() {
   echo "  1) pm2  — build and run Node (or similar) directly on the root server"
   echo "  2) docker — run the app in containers"
 
-  if [[ -n "${DEPLOYER_RUNNER:-}" ]]; then
-    RUNNER="$DEPLOYER_RUNNER"
-    echo "  runner: ${RUNNER} (DEPLOYER_RUNNER)"
+  if [[ -n "${PREVIA_RUNNER:-}" ]]; then
+    RUNNER="$PREVIA_RUNNER"
+    echo "  runner: ${RUNNER} (PREVIA_RUNNER)"
   else
     local choice
     while true; do
@@ -154,13 +161,13 @@ collect_runner_config() {
     echo "Docker image build location:"
     echo "  1) GitHub Actions (remote) — build and push to a registry in CI;"
     echo "     saves CPU on the root server but uses Actions minutes and requires"
-    echo "     an external registry (e.g. GHCR). The workflow sends the image ref to deployer."
+    echo "     an external registry (e.g. GHCR). The workflow sends the image ref to previa."
     echo "  2) Root server (local) — clone repo and docker build on the root machine;"
     echo "     no external registry needed, but builds consume root server resources."
 
-    if [[ -n "${DEPLOYER_DOCKER_BUILD:-}" ]]; then
-      DOCKER_BUILD="$DEPLOYER_DOCKER_BUILD"
-      echo "  docker build: ${DOCKER_BUILD} (DEPLOYER_DOCKER_BUILD)"
+    if [[ -n "${PREVIA_DOCKER_BUILD:-}" ]]; then
+      DOCKER_BUILD="$PREVIA_DOCKER_BUILD"
+      echo "  docker build: ${DOCKER_BUILD} (PREVIA_DOCKER_BUILD)"
     else
       local choice
       while true; do
@@ -197,7 +204,7 @@ done
 TARGET_DIR="$(cd "${TARGET_DIR:-.}" && pwd)"
 
 WORKFLOWS_DIR="${TARGET_DIR}/.github/workflows"
-DEPLOYER_YAML="${TARGET_DIR}/deployer.yaml"
+PREVIA_YAML="${TARGET_DIR}/previa.yaml"
 
 if [[ ! -d "$TARGET_DIR" ]]; then
   die "Directory does not exist: $TARGET_DIR"
@@ -214,13 +221,13 @@ collect_runner_config
 
 if [[ "$RUNNER" == "docker" && "$DOCKER_BUILD" == "remote" ]]; then
   SRC_DEPLOY="${ROOT_DIR}/actions/deploy-preview-docker-remote.yml"
-  SRC_CONFIG="${ROOT_DIR}/examples/deployer.docker-remote.yaml"
+  SRC_CONFIG="${ROOT_DIR}/examples/previa.docker-remote.yaml"
 elif [[ "$RUNNER" == "docker" ]]; then
   SRC_DEPLOY="${ROOT_DIR}/actions/deploy-preview-docker-local.yml"
-  SRC_CONFIG="${ROOT_DIR}/examples/deployer.docker-local.yaml"
+  SRC_CONFIG="${ROOT_DIR}/examples/previa.docker-local.yaml"
 else
   SRC_DEPLOY="${ROOT_DIR}/actions/deploy-preview.yml"
-  SRC_CONFIG="${ROOT_DIR}/examples/deployer.pm2.yaml"
+  SRC_CONFIG="${ROOT_DIR}/examples/previa.pm2.yaml"
 fi
 SRC_TEARDOWN="${ROOT_DIR}/actions/teardown-preview.yml"
 
@@ -284,11 +291,11 @@ apply_project_slug() {
   if [[ ! -f "$file" ]]; then
     return
   fi
-  if ! grep -q '__DEPLOYER_PROJECT_SLUG__' "$file"; then
+  if ! grep -q '__PREVIA_PROJECT_SLUG__' "$file"; then
     return
   fi
   local tmp="${file}.tmp.$$"
-  sed "s/__DEPLOYER_PROJECT_SLUG__/${PROJECT_SLUG}/g" "$file" > "$tmp"
+  sed "s/__PREVIA_PROJECT_SLUG__/${PROJECT_SLUG}/g" "$file" > "$tmp"
   mv "$tmp" "$file"
   log "set project slug in ${file#"$TARGET_DIR"/}"
 }
@@ -298,13 +305,13 @@ apply_registry_placeholders() {
   if [[ ! -f "$file" ]]; then
     return
   fi
-  if ! grep -q '__DEPLOYER_REGISTRY__\|__DEPLOYER_IMAGE_NAME__' "$file"; then
+  if ! grep -q '__PREVIA_REGISTRY__\|__PREVIA_IMAGE_NAME__' "$file"; then
     return
   fi
   local tmp="${file}.tmp.$$"
   sed \
-    -e "s/__DEPLOYER_REGISTRY__/${REGISTRY}/g" \
-    -e "s/__DEPLOYER_IMAGE_NAME__/${IMAGE_NAME}/g" \
+    -e "s/__PREVIA_REGISTRY__/${REGISTRY}/g" \
+    -e "s/__PREVIA_IMAGE_NAME__/${IMAGE_NAME}/g" \
     "$file" > "$tmp"
   mv "$tmp" "$file"
   log "set registry/image in ${file#"$TARGET_DIR"/}"
@@ -319,7 +326,7 @@ SKIPPED=0
 for pair in \
   "${SRC_DEPLOY}:${WORKFLOWS_DIR}/deploy-preview.yml" \
   "${SRC_TEARDOWN}:${WORKFLOWS_DIR}/teardown-preview.yml" \
-  "${SRC_CONFIG}:${DEPLOYER_YAML}"; do
+  "${SRC_CONFIG}:${PREVIA_YAML}"; do
   src="${pair%%:*}"
   dest="${pair#*:}"
   if write_file "$dest" "$src"; then
@@ -342,17 +349,17 @@ log "Done in ${TARGET_DIR}"
 log "  files written: ${WROTE}, skipped: ${SKIPPED}"
 echo ""
 echo "Next steps:"
-echo "  1. Register the project in the deployer dashboard (see registration JSON below)"
+echo "  1. Register the project in the previa dashboard (see registration JSON below)"
 echo "  2. Create an API key (Users → API Keys)"
-echo "  3. In the app repo GitHub settings, add secrets DEPLOYER_API_URL and DEPLOYER_API_KEY"
+echo "  3. In the app repo GitHub settings, add secrets PREVIA_API_URL and PREVIA_API_KEY"
 if [[ "$RUNNER" == "pm2" ]]; then
-  echo "  4. Adjust deployer.yaml (build steps and PM2 target) for your stack"
+  echo "  4. Adjust previa.yaml (build steps and PM2 target) for your stack"
 elif [[ "$DOCKER_BUILD" == "local" ]]; then
-  echo "  4. Add a Dockerfile and adjust deployer.yaml (port, dockerfile) for your stack"
+  echo "  4. Add a Dockerfile and adjust previa.yaml (port, dockerfile) for your stack"
 else
   echo "  4. Add a Dockerfile; the workflow builds and pushes to ${REGISTRY}/${IMAGE_NAME}"
 fi
-echo "  5. Commit and push .github/workflows/ and deployer.yaml"
+echo "  5. Commit and push .github/workflows/ and previa.yaml"
 echo ""
 echo "Runner: ${RUNNER}$([ "$RUNNER" == "docker" ] && echo " (build: ${DOCKER_BUILD})")"
 echo ""
@@ -373,5 +380,5 @@ echo ""
 echo "Import: Dashboard → Projects → Add project → Import registration JSON"
 echo ""
 echo "GitHub (repo → Settings → Secrets and variables → Actions):"
-echo "  Secrets: DEPLOYER_API_URL, DEPLOYER_API_KEY"
+echo "  Secrets: PREVIA_API_URL, PREVIA_API_KEY"
 echo "  (project slug is already set in the workflow files)"

@@ -43,6 +43,7 @@ import {
   lifetimeDurationMs,
 } from './instance-lifetime.util';
 import { stat } from 'fs/promises';
+import { existsSync } from 'fs';
 
 export type { DeployMeta } from '../deploy/deploy-meta';
 
@@ -197,7 +198,7 @@ export class PreviewInstancesService {
 
     return this.dataSource.transaction(async (manager) => {
       await manager.query(
-        `SELECT pg_advisory_xact_lock(hashtext('deployer-slot-reserve'))`,
+        `SELECT pg_advisory_xact_lock(hashtext('previa-slot-reserve'))`,
       );
 
       const project = await this.projects.getBySlug(projectSlug);
@@ -458,14 +459,14 @@ export class PreviewInstancesService {
     }
 
     const coreDir =
-      this.config.get<string>('DEPLOYER_CORE_DIR') ||
+      this.config.get<string>('PREVIA_CORE_DIR') ||
       join(__dirname, '..', '..', '..', 'core');
-    const workRoot = this.config.get<string>('DEPLOYER_WORK_ROOT');
+    const workRoot = this.config.get<string>('PREVIA_WORK_ROOT');
     if (!workRoot) {
-      throw new Error('DEPLOYER_WORK_ROOT não configurado');
+      throw new Error('PREVIA_WORK_ROOT não configurado');
     }
     const binDir = join(coreDir, 'bin');
-    const env = { ...process.env, DEPLOYER_WORK_ROOT: workRoot };
+    const env = { ...process.env, PREVIA_WORK_ROOT: workRoot };
     const script = join(binDir, 'destroy.sh');
 
     await execFileAsync(script, [row.project.slug, row.branch], { env });
@@ -620,14 +621,17 @@ export class PreviewInstancesService {
 
   private activityLogPath(projectSlug: string, branchSlug: string): string {
     const workRoot =
+      this.config.get<string>('PREVIA_WORK_ROOT') ||
       this.config.get<string>('DEPLOYER_WORK_ROOT') ||
-      join(process.env.HOME || '/tmp', '.local/share/deployer');
-    return join(
-      workRoot,
-      '.deployer-state',
-      'activity',
-      `${projectSlug}-${branchSlug}.log`,
-    );
+      join(process.env.HOME || '/tmp', '.local/share/previa');
+    const previaState = join(workRoot, '.previa-state');
+    const legacyState = join(workRoot, '.deployer-state');
+    const stateDir = existsSync(previaState)
+      ? previaState
+      : existsSync(legacyState)
+        ? legacyState
+        : previaState;
+    return join(stateDir, 'activity', `${projectSlug}-${branchSlug}.log`);
   }
 
   private async lastActivityMs(row: PreviewInstance): Promise<number> {

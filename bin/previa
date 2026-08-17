@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# deployer CLI — wrapper for scripts in scripts/
+# previa CLI — wrapper for scripts in scripts/
 set -euo pipefail
 
-resolve_deployer_root() {
-  if [[ -n "${DEPLOYER_ROOT:-}" ]]; then
-    echo "$DEPLOYER_ROOT"
+resolve_previa_root() {
+  if [[ -n "${PREVIA_ROOT:-${DEPLOYER_ROOT:-}}" ]]; then
+    echo "${PREVIA_ROOT:-$DEPLOYER_ROOT}"
+    return
+  fi
+  if [[ -f "${HOME}/.config/previa/root" ]]; then
+    cat "${HOME}/.config/previa/root"
     return
   fi
   if [[ -f "${HOME}/.config/deployer/root" ]]; then
@@ -21,11 +25,11 @@ resolve_deployer_root() {
   echo "$dir"
 }
 
-ROOT="$(resolve_deployer_root)"
+ROOT="$(resolve_previa_root)"
 
 if [[ ! -d "$ROOT/scripts" ]]; then
-  echo "deployer: invalid install directory: $ROOT" >&2
-  echo "Set DEPLOYER_ROOT or reinstall with scripts/install.sh" >&2
+  echo "previa: invalid install directory: $ROOT" >&2
+  echo "Set PREVIA_ROOT or reinstall with scripts/install.sh" >&2
   exit 1
 fi
 
@@ -33,12 +37,12 @@ cmd="${1:-help}"
 shift || true
 
 confirm_down() {
-  if [[ "${DEPLOYER_YES:-}" == "1" || "${1:-}" == "-y" || "${1:-}" == "--yes" ]]; then
+  if [[ "${PREVIA_YES:-${DEPLOYER_YES:-}}" == "1" || "${1:-}" == "-y" || "${1:-}" == "--yes" ]]; then
     return 0
   fi
   echo ""
-  echo "⚠  This will shut down deployer:"
-  echo "   • API (PM2: deployer-api)"
+  echo "⚠  This will shut down Previa:"
+  echo "   • API (PM2: previa-api)"
   echo "   • Docker containers (Postgres, Redis, Web)"
   echo ""
   read -r -p "Continue? [y/N] " ans
@@ -70,13 +74,16 @@ case "$cmd" in
     exec bash "${ROOT}/scripts/dev-up.sh" "$@"
     ;;
   status)
-    echo "=== Deployer ($ROOT) ==="
+    echo "=== Previa ($ROOT) ==="
     ENV_FILE="${ROOT}/api/.env"
-    PUBLIC_ENV="${ROOT}/deployer.env"
+    PUBLIC_ENV="${ROOT}/previa.env"
+    if [[ ! -f "$PUBLIC_ENV" && -f "${ROOT}/deployer.env" ]]; then
+      PUBLIC_ENV="${ROOT}/deployer.env"
+    fi
     if [[ -f "$ENV_FILE" ]]; then
       api_port="$(grep -E '^PORT=' "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '[:space:]')"
       cors="$(grep -E '^CORS_ORIGIN=' "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '[:space:]')"
-      pg_port="$(grep -E '^DATABASE_URL=' "$ENV_FILE" 2>/dev/null | tail -1 | sed -n 's/.*:\([0-9]*\)\/deployer.*/\1/p')"
+      pg_port="$(grep -E '^DATABASE_URL=' "$ENV_FILE" 2>/dev/null | tail -1 | sed -n 's/.*:\([0-9]*\)\/\(previa\|deployer\).*/\1/p')"
       redis_port="$(grep -E '^REDIS_PORT=' "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '[:space:]')"
       echo ""
       echo "Ports (from api/.env):"
@@ -87,26 +94,30 @@ case "$cmd" in
     fi
     if [[ -f "$PUBLIC_ENV" ]]; then
       echo ""
-      echo "deployer.env:"
-      grep -E '^DEPLOYER_(PUBLIC_|API_PORT|WEB_PORT|POSTGRES_PORT|REDIS_PORT)' "$PUBLIC_ENV" 2>/dev/null | sed 's/^/  /' || true
+      echo "previa.env:"
+      grep -E '^PREVIA_(PUBLIC_|API_PORT|WEB_PORT|POSTGRES_PORT|REDIS_PORT)|^DEPLOYER_(PUBLIC_|API_PORT|WEB_PORT|POSTGRES_PORT|REDIS_PORT)' "$PUBLIC_ENV" 2>/dev/null | sed 's/^/  /' || true
     else
       echo ""
-      echo "deployer.env: (absent — localhost defaults + auto ports)"
-      echo "  Tip: cp deployer.env.example deployer.env"
+      echo "previa.env: (absent — localhost defaults + auto ports)"
+      echo "  Tip: cp previa.env.example previa.env"
     fi
     echo ""
     echo "Docker:"
-    if docker ps -a --filter 'name=deployer-' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null | grep -q deployer; then
+    if docker ps -a --filter 'name=previa-' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null | grep -q previa; then
+      docker ps -a --filter 'name=previa-' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+    elif docker ps -a --filter 'name=deployer-' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null | grep -q deployer; then
       docker ps -a --filter 'name=deployer-' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
     else
-      echo "  (no deployer-* containers)"
+      echo "  (no previa-* containers)"
     fi
     echo ""
     echo "PM2:"
     if command -v pm2 >/dev/null 2>&1; then
-      pm2 describe deployer-api 2>/dev/null | grep -E 'status|name|script path' || echo "  deployer-api is not running"
+      pm2 describe previa-api 2>/dev/null | grep -E 'status|name|script path' \
+        || pm2 describe deployer-api 2>/dev/null | grep -E 'status|name|script path' \
+        || echo "  previa-api is not running"
     else
-      npx --yes pm2 describe deployer-api 2>/dev/null | grep -E 'status|name|script path' || echo "  deployer-api is not running"
+      npx --yes pm2 describe previa-api 2>/dev/null | grep -E 'status|name|script path' || echo "  previa-api is not running"
     fi
     ;;
   logs)
@@ -114,29 +125,32 @@ case "$cmd" in
     case "$target" in
       api)
         if command -v pm2 >/dev/null 2>&1; then
-          exec pm2 logs deployer-api --lines 100
+          exec pm2 logs previa-api --lines 100
         else
-          exec npx --yes pm2 logs deployer-api --lines 100
+          exec npx --yes pm2 logs previa-api --lines 100
         fi
         ;;
       web|front)
+        if docker inspect previa-web >/dev/null 2>&1; then
+          exec docker logs -f --tail 100 previa-web
+        fi
         exec docker logs -f --tail 100 deployer-web
         ;;
       *)
-        echo "Usage: deployer logs [api|web]" >&2
+        echo "Usage: previa logs [api|web]" >&2
         exit 1
         ;;
     esac
     ;;
   update|pull)
-    echo "[deployer] Updating repository at $ROOT..."
+    echo "[previa] Updating repository at $ROOT..."
     git -C "$ROOT" pull --ff-only
-    deployer_in_path="$(command -v deployer 2>/dev/null || true)"
-    if [[ -n "$deployer_in_path" ]]; then
-      export DEPLOYER_BIN_DIR="$(dirname "$deployer_in_path")"
+    previa_in_path="$(command -v previa 2>/dev/null || true)"
+    if [[ -n "$previa_in_path" ]]; then
+      export PREVIA_BIN_DIR="$(dirname "$previa_in_path")"
     fi
     bash "${ROOT}/scripts/sync-cli.sh"
-    echo "[deployer] OK — executable and scripts updated"
+    echo "[previa] OK — executable and scripts updated"
     ;;
   project)
     sub="${1:-help}"
@@ -149,8 +163,8 @@ case "$cmd" in
         exec bash "${ROOT}/scripts/project-init.sh" --help
         ;;
       *)
-        echo "deployer: unknown project command: $sub" >&2
-        echo "Run: deployer project init --help" >&2
+        echo "previa: unknown project command: $sub" >&2
+        echo "Run: previa project init --help" >&2
         exit 1
         ;;
     esac
@@ -160,9 +174,9 @@ case "$cmd" in
     ;;
   help|-h|--help)
     cat <<EOF
-deployer — local Deployer stack management
+previa — local Previa stack management
 
-Usage: deployer <command> [options]
+Usage: previa <command> [options]
 
 Stack:
   setup, up, start     Start Postgres, Redis, web (Docker) and API (PM2)
@@ -174,7 +188,7 @@ Stack:
   root, path           Print install directory
 
 Project:
-  project init [PATH]  Copy GitHub Actions + deployer.yaml into an app repo
+  project init [PATH]  Copy GitHub Actions + previa.yaml into an app repo
   project init --help  Options: -f/--force, --branches
 
 nginx:
@@ -186,7 +200,7 @@ Global:
 
 Options:
   down/restart -y, --yes   Skip confirmation
-  DEPLOYER_YES=1           Same as above
+  PREVIA_YES=1           Same as above
 
 Install: curl -fsSL .../scripts/install.sh | bash
 Directory: $ROOT
@@ -194,8 +208,8 @@ Docs: README.md in the install directory
 EOF
     ;;
   *)
-    echo "deployer: unknown command: $cmd" >&2
-    echo "Run: deployer help" >&2
+    echo "previa: unknown command: $cmd" >&2
+    echo "Run: previa help" >&2
     exit 1
     ;;
 esac

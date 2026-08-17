@@ -29,7 +29,7 @@ export class DeployProcessor extends WorkerHost {
   ) {
     super();
     this.logger.log(
-      `Deploy worker concurrency=${resolveDeployConcurrency(this.config.get<string>('DEPLOYER_DEPLOY_CONCURRENCY'))}`,
+      `Deploy worker concurrency=${resolveDeployConcurrency(this.config.get<string>('PREVIA_DEPLOY_CONCURRENCY'))}`,
     );
   }
 
@@ -88,14 +88,14 @@ export class DeployProcessor extends WorkerHost {
 
   async destroyAction(job: Job<DeployJobPayload>) {
     const coreDir =
-      this.config.get<string>('DEPLOYER_CORE_DIR') ||
+      this.config.get<string>('PREVIA_CORE_DIR') ||
       join(__dirname, '..', '..', '..', 'core');
-    const workRoot = this.config.get<string>('DEPLOYER_WORK_ROOT');
+    const workRoot = this.config.get<string>('PREVIA_WORK_ROOT');
     if (!workRoot) {
-      throw new Error('DEPLOYER_WORK_ROOT não configurado');
+      throw new Error('PREVIA_WORK_ROOT não configurado');
     }
     const binDir = join(coreDir, 'bin');
-    const env = { ...process.env, DEPLOYER_WORK_ROOT: workRoot };
+    const env = { ...process.env, PREVIA_WORK_ROOT: workRoot };
 
     const script = join(binDir, 'destroy.sh');
     await execFileAsync(script, [job.data.projectSlug, job.data.branch], {

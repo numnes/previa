@@ -1,17 +1,50 @@
 #!/usr/bin/env bash
-# Biblioteca compartilhada do deployer core.
+# Biblioteca compartilhada do core Previa.
 set -euo pipefail
 
-: "${DEPLOYER_WORK_ROOT:?Defina DEPLOYER_WORK_ROOT (ex: /home/deployer)}"
-: "${DEPLOYER_STATE_DIR:="${DEPLOYER_WORK_ROOT}/.deployer-state"}"
-: "${DEPLOYER_LOCATIONS_DIR:="${HOME}/deployer/locations"}"
-: "${DEPLOYER_ACTIVITY_DIR:="${DEPLOYER_STATE_DIR}/activity"}"
-# Upstream HTTP da API para wake sob demanda (idle sleep).
-: "${DEPLOYER_WAKE_UPSTREAM:=http://127.0.0.1:3000}"
+# Compat: instalações antigas ainda exportam DEPLOYER_*.
+if [[ -z "${PREVIA_WORK_ROOT:-}" && -n "${DEPLOYER_WORK_ROOT:-}" ]]; then
+  PREVIA_WORK_ROOT="$DEPLOYER_WORK_ROOT"
+fi
+if [[ -z "${PREVIA_LOCATIONS_DIR:-}" && -n "${DEPLOYER_LOCATIONS_DIR:-}" ]]; then
+  PREVIA_LOCATIONS_DIR="$DEPLOYER_LOCATIONS_DIR"
+fi
+if [[ -z "${PREVIA_WAKE_UPSTREAM:-}" && -n "${DEPLOYER_WAKE_UPSTREAM:-}" ]]; then
+  PREVIA_WAKE_UPSTREAM="$DEPLOYER_WAKE_UPSTREAM"
+fi
+if [[ -z "${PREVIA_STATE_DIR:-}" && -n "${DEPLOYER_STATE_DIR:-}" ]]; then
+  PREVIA_STATE_DIR="$DEPLOYER_STATE_DIR"
+fi
 
-mkdir -p "$DEPLOYER_STATE_DIR"
-mkdir -p "$DEPLOYER_LOCATIONS_DIR"
-mkdir -p "$DEPLOYER_ACTIVITY_DIR"
+: "${PREVIA_WORK_ROOT:?Defina PREVIA_WORK_ROOT (ex: /home/previa)}"
+
+if [[ -z "${PREVIA_STATE_DIR:-}" ]]; then
+  if [[ -d "${PREVIA_WORK_ROOT}/.previa-state" ]]; then
+    PREVIA_STATE_DIR="${PREVIA_WORK_ROOT}/.previa-state"
+  elif [[ -d "${PREVIA_WORK_ROOT}/.deployer-state" ]]; then
+    PREVIA_STATE_DIR="${PREVIA_WORK_ROOT}/.deployer-state"
+  else
+    PREVIA_STATE_DIR="${PREVIA_WORK_ROOT}/.previa-state"
+  fi
+fi
+
+if [[ -z "${PREVIA_LOCATIONS_DIR:-}" ]]; then
+  if [[ -d "${HOME}/previa/locations" ]]; then
+    PREVIA_LOCATIONS_DIR="${HOME}/previa/locations"
+  elif [[ -d "${HOME}/deployer/locations" ]]; then
+    PREVIA_LOCATIONS_DIR="${HOME}/deployer/locations"
+  else
+    PREVIA_LOCATIONS_DIR="${HOME}/previa/locations"
+  fi
+fi
+
+: "${PREVIA_ACTIVITY_DIR:="${PREVIA_STATE_DIR}/activity"}"
+# Upstream HTTP da API para wake sob demanda (idle sleep).
+: "${PREVIA_WAKE_UPSTREAM:=http://127.0.0.1:3000}"
+
+mkdir -p "$PREVIA_STATE_DIR"
+mkdir -p "$PREVIA_LOCATIONS_DIR"
+mkdir -p "$PREVIA_ACTIVITY_DIR"
 
 sanitize_branch_slug() {
   local b="$1"
@@ -30,7 +63,7 @@ pm2_app_name() {
 
 read_instance_runner() {
   local name="$1"
-  local runner_file="${DEPLOYER_STATE_DIR}/${name}.runner"
+  local runner_file="${PREVIA_STATE_DIR}/${name}.runner"
   if [[ -f "$runner_file" ]]; then
     cat "$runner_file"
     return 0
@@ -41,7 +74,7 @@ read_instance_runner() {
 write_instance_runner() {
   local name="$1"
   local runner="$2"
-  echo "$runner" >"${DEPLOYER_STATE_DIR}/${name}.runner"
+  echo "$runner" >"${PREVIA_STATE_DIR}/${name}.runner"
 }
 
 stop_instance() {
@@ -97,12 +130,12 @@ is_port_listening() {
   ss -tuln 2>/dev/null | grep -qE ":${p}([[:space:]]|$)"
 }
 
-# Portas gravadas em ${DEPLOYER_STATE_DIR}/*.port (exceto a instância informada).
+# Portas gravadas em ${PREVIA_STATE_DIR}/*.port (exceto a instância informada).
 list_reserved_ports_except() {
   local exclude_name="${1:-}"
   local f base port
   shopt -s nullglob
-  for f in "${DEPLOYER_STATE_DIR}"/*.port; do
+  for f in "${PREVIA_STATE_DIR}"/*.port; do
     base="$(basename "$f" .port)"
     if [[ -n "$exclude_name" && "$base" == "$exclude_name" ]]; then
       continue
@@ -121,14 +154,14 @@ reserve_free_port() {
   local name="$1"
   local start="${2:-10200}"
   local end="${3:-19999}"
-  local lockfile="${DEPLOYER_STATE_DIR}/.port-alloc.lock"
+  local lockfile="${PREVIA_STATE_DIR}/.port-alloc.lock"
   local out
 
   if [[ -z "$name" ]]; then
     echo "reserve_free_port: nome da instância obrigatório" >&2
     return 1
   fi
-  mkdir -p "$DEPLOYER_STATE_DIR"
+  mkdir -p "$PREVIA_STATE_DIR"
 
   if ! out="$(
     {
@@ -136,8 +169,8 @@ reserve_free_port() {
       local existing p r skip
       local -a reserved=()
 
-      if [[ -f "${DEPLOYER_STATE_DIR}/${name}.port" ]]; then
-        existing="$(tr -d '[:space:]' <"${DEPLOYER_STATE_DIR}/${name}.port" 2>/dev/null || true)"
+      if [[ -f "${PREVIA_STATE_DIR}/${name}.port" ]]; then
+        existing="$(tr -d '[:space:]' <"${PREVIA_STATE_DIR}/${name}.port" 2>/dev/null || true)"
         if [[ "$existing" =~ ^[0-9]+$ ]]; then
           # Reserva própria: reusa (sleep/pause ou redeploy da mesma instância).
           printf '%s\n' "$existing"
@@ -163,7 +196,7 @@ reserve_free_port() {
         if [[ "$skip" -eq 1 ]]; then
           continue
         fi
-        printf '%s\n' "$p" >"${DEPLOYER_STATE_DIR}/${name}.port"
+        printf '%s\n' "$p" >"${PREVIA_STATE_DIR}/${name}.port"
         printf '%s\n' "$p"
         exit 0
       done
@@ -223,7 +256,7 @@ preview_uri_path() {
 activity_log_path() {
   local project_slug="$1"
   local branch_slug="$2"
-  echo "${DEPLOYER_ACTIVITY_DIR}/${project_slug}-${branch_slug}.log"
+  echo "${PREVIA_ACTIVITY_DIR}/${project_slug}-${branch_slug}.log"
 }
 
 touch_activity_log() {
@@ -276,7 +309,7 @@ write_wake_location_file() {
   local locations_dir="$1"
   local project_slug="$2"
   local branch_slug="$3"
-  local wake_upstream="${4:-$DEPLOYER_WAKE_UPSTREAM}"
+  local wake_upstream="${4:-$PREVIA_WAKE_UPSTREAM}"
   local location_basename uri_path path
   location_basename="$(location_file_basename "$project_slug" "$branch_slug")"
   uri_path="$(preview_uri_path "$project_slug" "$branch_slug")"
@@ -292,8 +325,8 @@ location ^~ /${uri_path}/ {
     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto \$scheme;
     proxy_set_header X-Original-URI \$request_uri;
-    proxy_set_header X-Deployer-Project ${project_slug};
-    proxy_set_header X-Deployer-Branch-Slug ${branch_slug};
+    proxy_set_header X-Previa-Project ${project_slug};
+    proxy_set_header X-Previa-Branch-Slug ${branch_slug};
     proxy_read_timeout 120s;
     proxy_connect_timeout 10s;
 }
@@ -301,11 +334,14 @@ EOF
   echo "$path"
 }
 
-parse_deployer_yaml() {
+parse_previa_yaml() {
   local repo_dir="$1"
-  local yaml="${repo_dir}/deployer.yaml"
+  local yaml="${repo_dir}/previa.yaml"
   if [[ ! -f "$yaml" ]]; then
-    echo "Arquivo deployer.yaml não encontrado em ${repo_dir}" >&2
+    yaml="${repo_dir}/deployer.yaml"
+  fi
+  if [[ ! -f "$yaml" ]]; then
+    echo "Arquivo previa.yaml não encontrado em ${repo_dir}" >&2
     return 1
   fi
   python3 - "$yaml" <<'PY'
@@ -333,7 +369,7 @@ else:
         build = [build]
     target = d.get("target")
     if not target:
-        raise SystemExit("deployer.yaml: campo 'target' é obrigatório para runner pm2")
+        raise SystemExit("previa.yaml: campo 'target' é obrigatório para runner pm2")
     print(target)
     for c in build:
         print("BUILD:" + c)
@@ -364,13 +400,13 @@ if isinstance(extras, list):
 PY
 }
 
-# Junta env do deployer.yaml + arquivo da API (API sobrescreve) num arquivo dotenv.
+# Junta env do previa.yaml + arquivo da API (API sobrescreve) num arquivo dotenv.
 # Uso: merge_app_env_file <arquivo-saida> ENV:key=value...
-# Lê também DEPLOYER_APP_ENV_FILE se definido.
+# Lê também PREVIA_APP_ENV_FILE se definido.
 merge_app_env_file() {
   local out_file="$1"
   shift
-  python3 - "$out_file" "${DEPLOYER_APP_ENV_FILE:-}" "$@" <<'PY'
+  python3 - "$out_file" "${PREVIA_APP_ENV_FILE:-}" "$@" <<'PY'
 import sys, re
 out_path = sys.argv[1]
 api_path = sys.argv[2] or ""

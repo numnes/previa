@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 /**
- * Create or update admin user via Deployer API (setup key).
+ * Create or update admin user via Previa API (setup key).
  *
  * Usage:
  *   node scripts/seed-default-user.js count
  *   node scripts/seed-default-user.js list
- *   DEPLOYER_SEED_EMAIL=... DEPLOYER_SEED_PASSWORD=... node scripts/seed-default-user.js
+ *   PREVIA_SEED_EMAIL=... PREVIA_SEED_PASSWORD=... node scripts/seed-default-user.js
  */
 const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const ENV_PATH = path.join(ROOT, 'api', '.env');
-const SETUP_KEY_HEADER = 'x-deployer-setup-key';
+const SETUP_KEY_HEADER = 'x-previa-setup-key';
 
 function loadEnvVar(key) {
   if (process.env[key]) return process.env[key].trim();
@@ -30,17 +30,22 @@ function loadEnvVar(key) {
 }
 
 function apiBase() {
-  const fromEnv = (process.env.DEPLOYER_API_URL || '').trim();
+  const fromEnv = (process.env.PREVIA_API_URL || '').trim();
   if (fromEnv) return fromEnv.replace(/\/$/, '');
   const port = loadEnvVar('PORT') || '3000';
   return `http://127.0.0.1:${port}`;
 }
 
 function setupKey() {
-  const key = (process.env.DEPLOYER_SETUP_KEY || loadEnvVar('DEPLOYER_SETUP_KEY')).trim();
+  const key = (
+    process.env.PREVIA_SETUP_KEY ||
+    loadEnvVar('PREVIA_SETUP_KEY') ||
+    process.env.DEPLOYER_SETUP_KEY ||
+    loadEnvVar('DEPLOYER_SETUP_KEY')
+  ).trim();
   if (!key) {
     throw new Error(
-      'DEPLOYER_SETUP_KEY não encontrada. Rode deployer setup ou defina em api/.env.',
+      'PREVIA_SETUP_KEY não encontrada. Rode previa setup ou defina em api/.env.',
     );
   }
   return key;
@@ -61,7 +66,7 @@ async function waitForApi() {
     }
     await sleep(1000);
   }
-  throw new Error(`API não respondeu em ${base}. Confirme que deployer-api está rodando.`);
+  throw new Error(`API não respondeu em ${base}. Confirme que previa-api está rodando.`);
 }
 
 async function apiFetch(path, options = {}) {
@@ -109,11 +114,11 @@ async function listUserEmails() {
 }
 
 async function seedUser() {
-  const email = (process.env.DEPLOYER_SEED_EMAIL || '').trim();
-  const password = process.env.DEPLOYER_SEED_PASSWORD || '';
+  const email = (process.env.PREVIA_SEED_EMAIL || '').trim();
+  const password = process.env.PREVIA_SEED_PASSWORD || '';
 
   if (!email || !password) {
-    console.error('[seed-user] DEPLOYER_SEED_EMAIL and DEPLOYER_SEED_PASSWORD are required.');
+    console.error('[seed-user] PREVIA_SEED_EMAIL and PREVIA_SEED_PASSWORD are required.');
     process.exit(1);
   }
   if (password.length < 8) {

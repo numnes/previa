@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Print an nginx config with the deployer locations include line added.
+# Print an nginx config with the previa locations include line added.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -9,10 +9,10 @@ FORCE_FILE=""
 
 usage() {
   cat <<EOF
-Usage: deployer setup nginx [options]
+Usage: previa setup nginx [options]
 
 List nginx sites-enabled configs, pick one, and print an updated
-version with the deployer locations include line (if not already present).
+version with the previa locations include line (if not already present).
 
 Replace the file contents manually with the printed output.
 
@@ -22,11 +22,11 @@ Options:
   -h, --help            Show this help
 
 Environment:
-  DEPLOYER_LOCATIONS_DIR   Locations directory (default: ~/deployer/locations)
+  PREVIA_LOCATIONS_DIR   Locations directory (default: ~/previa/locations)
   NGINX_SITES_ENABLED      Same as --sites-dir
 
 The added line looks like:
-    include /path/to/locations/*.location;    # deployer
+    include /path/to/locations/*.location;    # previa
 EOF
 }
 
@@ -34,31 +34,37 @@ log() { echo "[setup-nginx] $*"; }
 die() { echo "[setup-nginx] ERROR: $*" >&2; exit 1; }
 
 resolve_locations_dir() {
-  if [[ -n "${DEPLOYER_LOCATIONS_DIR:-}" ]]; then
-    printf '%s' "$DEPLOYER_LOCATIONS_DIR"
+  if [[ -n "${PREVIA_LOCATIONS_DIR:-${DEPLOYER_LOCATIONS_DIR:-}}" ]]; then
+    printf '%s' "${PREVIA_LOCATIONS_DIR:-$DEPLOYER_LOCATIONS_DIR}"
     return
   fi
   local env_file="${ROOT_DIR}/api/.env"
   if [[ -f "$env_file" ]]; then
     local from_env
-    from_env="$(grep -E '^DEPLOYER_LOCATIONS_DIR=' "$env_file" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '[:space:]"'"'" || true)"
+    from_env="$(grep -E '^(PREVIA_LOCATIONS_DIR|DEPLOYER_LOCATIONS_DIR)=' "$env_file" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '[:space:]"'"'" || true)"
     if [[ -n "$from_env" ]]; then
       printf '%s' "$from_env"
       return
     fi
   fi
-  printf '%s' "${HOME}/deployer/locations"
+  if [[ -d "${HOME}/previa/locations" ]]; then
+    printf '%s' "${HOME}/previa/locations"
+  elif [[ -d "${HOME}/deployer/locations" ]]; then
+    printf '%s' "${HOME}/deployer/locations"
+  else
+    printf '%s' "${HOME}/previa/locations"
+  fi
 }
 
 include_line() {
   local locations_dir="$1"
-  printf '    include %s/*.location;    # deployer' "$locations_dir"
+  printf '    include %s/*.location;    # previa' "$locations_dir"
 }
 
 file_has_include() {
   local file="$1"
   local locations_dir="$2"
-  if grep -qF '# deployer' "$file" 2>/dev/null; then
+  if grep -qE '# (previa|deployer)' "$file" 2>/dev/null; then
     return 0
   fi
   if grep -qF "${locations_dir}" "$file" 2>/dev/null && grep -qE '\.location' "$file" 2>/dev/null; then
@@ -88,7 +94,7 @@ render_with_include() {
   else
     cat "$file"
     echo ""
-    echo "# Added by deployer setup nginx"
+    echo "# Added by previa setup nginx"
     echo "$line"
   fi
 }

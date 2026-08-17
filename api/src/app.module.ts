@@ -35,7 +35,7 @@ import { UsersModule } from './users/users.module';
         const url = config.get<string>('DATABASE_URL')?.trim();
         if (!url) {
           throw new Error(
-            'DATABASE_URL is missing or empty. Check api/.env and restart with: deployer down -y && deployer setup',
+            'DATABASE_URL is missing or empty. Check api/.env and restart with: previa down -y && previa setup',
           );
         }
         return {

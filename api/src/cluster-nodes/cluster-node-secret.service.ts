@@ -57,10 +57,14 @@ export class ClusterNodeSecretService {
   }
 
   private key(): Buffer {
-    const secret = this.config.get<string>('DEPLOYER_CLUSTER_SECRET')?.trim();
+    const secret = (
+      this.config.get<string>('PREVIA_CLUSTER_SECRET') ||
+      this.config.get<string>('DEPLOYER_CLUSTER_SECRET') ||
+      ''
+    ).trim();
     if (!secret) {
       throw new InternalServerErrorException(
-        'DEPLOYER_CLUSTER_SECRET não configurado; não é possível usar credenciais cluster',
+        'PREVIA_CLUSTER_SECRET não configurado; não é possível usar credenciais cluster',
       );
     }
     return createHash('sha256').update(secret, 'utf8').digest();

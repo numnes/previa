@@ -1,7 +1,7 @@
 # Copy to your app repo: .github/workflows/deploy-preview.yml
-# Repository secrets: DEPLOYER_API_URL, DEPLOYER_API_KEY
-# PROJECT_SLUG is set by deployer project init
-name: Deploy preview (deployer)
+# Repository secrets: PREVIA_API_URL, PREVIA_API_KEY
+# PROJECT_SLUG is set by previa project init
+name: Deploy preview (previa)
 
 on:
   pull_request:
@@ -16,16 +16,16 @@ jobs:
     steps:
       - name: Request preview deploy
         env:
-          DEPLOYER_API_URL: ${{ secrets.DEPLOYER_API_URL }}
-          DEPLOYER_API_KEY: ${{ secrets.DEPLOYER_API_KEY }}
-          PROJECT_SLUG: __DEPLOYER_PROJECT_SLUG__
+          PREVIA_API_URL: ${{ secrets.PREVIA_API_URL || secrets.DEPLOYER_API_URL }}
+          PREVIA_API_KEY: ${{ secrets.PREVIA_API_KEY || secrets.DEPLOYER_API_KEY }}
+          PROJECT_SLUG: __PREVIA_PROJECT_SLUG__
         run: |
-          if [ -z "$DEPLOYER_API_URL" ] || [ -z "$DEPLOYER_API_KEY" ]; then
-            echo "Set repository secrets DEPLOYER_API_URL and DEPLOYER_API_KEY."
+          if [ -z "$PREVIA_API_URL" ] || [ -z "$PREVIA_API_KEY" ]; then
+            echo "Set repository secrets PREVIA_API_URL and PREVIA_API_KEY (or legacy DEPLOYER_*)."
             exit 1
           fi
           BRANCH="${{ github.head_ref || github.ref_name }}"
-          curl -fsS -X POST "${DEPLOYER_API_URL%/}/deploy" \
+          curl -fsS -X POST "${PREVIA_API_URL%/}/deploy" \
             -H "Content-Type: application/json" \
-            -H "X-Deployer-Api-Key: ${DEPLOYER_API_KEY}" \
+            -H "X-Previa-Api-Key: ${PREVIA_API_KEY}" \
             -d "{\"project\":\"${PROJECT_SLUG}\",\"branch\":\"${BRANCH}\"}"

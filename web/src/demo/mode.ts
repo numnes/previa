@@ -1,4 +1,4 @@
-export const DEMO_STORAGE_KEY = 'deployer_demo';
+export const DEMO_STORAGE_KEY = 'previa_demo';
 export const DEMO_TOKEN_PREFIX = 'demo.';
 
 /** Demo ligado via build (GitHub Pages) ou via localStorage (/demo). */

@@ -23,20 +23,22 @@ export class WakeController {
   async wake(
     @Req() req: Request,
     @Res() res: Response,
-    @Headers('x-deployer-project') projectHeader?: string,
-    @Headers('x-deployer-branch-slug') branchSlugHeader?: string,
+    @Headers('x-previa-project') projectHeader?: string,
+    @Headers('x-deployer-project') projectHeaderLegacy?: string,
+    @Headers('x-previa-branch-slug') branchSlugHeader?: string,
+    @Headers('x-deployer-branch-slug') branchSlugHeaderLegacy?: string,
     @Headers('x-original-uri') originalUri?: string,
     @Headers('x-forwarded-proto') forwardedProto?: string,
     @Headers('x-forwarded-host') forwardedHost?: string,
     @Headers('host') hostHeader?: string,
   ) {
-    const projectSlug = (projectHeader || '').trim();
-    const branchSlug = (branchSlugHeader || '').trim();
+    const projectSlug = (projectHeader || projectHeaderLegacy || '').trim();
+    const branchSlug = (branchSlugHeader || branchSlugHeaderLegacy || '').trim();
     if (!projectSlug || !branchSlug) {
       res
         .status(400)
         .type('text/plain')
-        .send('Missing X-Deployer-Project / X-Deployer-Branch-Slug');
+        .send('Missing X-Previa-Project / X-Previa-Branch-Slug');
       return;
     }
 

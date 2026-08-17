@@ -33,6 +33,9 @@ async function bootstrap() {
     allowedHeaders: [
       'Content-Type',
       'Authorization',
+      'X-Previa-Api-Key',
+      'X-Previa-Setup-Key',
+      'X-Previa-Cluster-Key',
       'X-Deployer-Api-Key',
       'X-Deployer-Setup-Key',
       'X-Deployer-Cluster-Key',
@@ -50,8 +53,8 @@ async function bootstrap() {
   );
 
   const config = new DocumentBuilder()
-    .setTitle('Deployer API')
-    .setDescription('Documentação da API do Deployer')
+    .setTitle('Previa API')
+    .setDescription('Documentação da API do Previa')
     .setVersion('1.0.0')
     .addBearerAuth(
       {
@@ -65,7 +68,7 @@ async function bootstrap() {
       {
         type: 'apiKey',
         in: 'header',
-        name: 'x-deployer-api-key',
+        name: 'x-previa-api-key',
         description: 'Chave usada para endpoints de deploy',
       },
       'deploy-api-key',
@@ -74,9 +77,9 @@ async function bootstrap() {
       {
         type: 'apiKey',
         in: 'header',
-        name: 'x-deployer-setup-key',
+        name: 'x-previa-setup-key',
         description:
-          'Chave gerada na máquina root (DEPLOYER_SETUP_KEY) para bootstrap de usuários',
+          'Chave gerada na máquina root (PREVIA_SETUP_KEY) para bootstrap de usuários',
       },
       'setup-key',
     )
@@ -84,7 +87,7 @@ async function bootstrap() {
       {
         type: 'apiKey',
         in: 'header',
-        name: 'x-deployer-cluster-key',
+        name: 'x-previa-cluster-key',
         description: 'Chave cluster (clu_…) para leitura remota entre nós',
       },
       'cluster-key',
