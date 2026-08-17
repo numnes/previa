@@ -150,7 +150,18 @@ case "$cmd" in
       export PREVIA_BIN_DIR="$(dirname "$previa_in_path")"
     fi
     bash "${ROOT}/scripts/sync-cli.sh"
-    echo "[previa] OK — executable and scripts updated"
+    # shellcheck source=../scripts/lib/public-env.sh
+    source "${ROOT}/scripts/lib/public-env.sh"
+    # shellcheck source=../scripts/lib/work-root.sh
+    source "${ROOT}/scripts/lib/work-root.sh"
+    load_previa_public_env "$ROOT"
+    previa_sync_work_root_env "$ROOT" >/dev/null
+    if command -v pm2 >/dev/null 2>&1; then
+      pm2 restart previa-api --update-env >/dev/null 2>&1 \
+        || pm2 restart deployer-api --update-env >/dev/null 2>&1 \
+        || true
+    fi
+    echo "[previa] OK — executable, scripts, and PREVIA_WORK_ROOT updated"
     ;;
   project)
     sub="${1:-help}"
@@ -184,7 +195,7 @@ Stack:
   restart              down + setup (asks for confirmation)
   status               Show ports, Docker containers, and PM2 API
   logs [api|web]       Follow API (PM2) or web (Docker) logs
-  update, pull         git pull + refresh CLI symlink and scripts
+  update, pull         git pull + refresh CLI, rewrite PREVIA_WORK_ROOT, restart API
   root, path           Print install directory
 
 Project:
