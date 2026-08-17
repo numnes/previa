@@ -41,7 +41,7 @@ If `previa.env` is absent, defaults stay on `http://localhost:<ports>` and ports
 | `DATABASE_URL`              | Postgres (`postgresql://postgres:deployer@localhost:<port>/deployer`)                               |
 | `REDIS_HOST` / `REDIS_PORT` | Redis for BullMQ                                                                                    |
 | `CORS_ORIGIN`               | Web UI Origin allowed by the API (from `PREVIA_PUBLIC_WEB_URL` or localhost)                      |
-| `PREVIA_WORK_ROOT`        | Where branch checkouts live on disk                                                                 |
+| `PREVIA_WORK_ROOT`        | Checkout root. Rewritten on `previa setup`/`restart` to `$HOME/.local/share/deployer` if that dir exists, otherwise `$HOME/.local/share/previa`. Unwritable leftovers like `/home/previa/...` from `.env.example` are replaced. Pin a custom path in `previa.env`. |
 | `PREVIA_CORE_DIR`         | Path to `core/`                                                                                     |
 | `PREVIA_LOCATIONS_DIR`    | nginx `*.location` files (default `~/previa/locations`)                                           |
 | `PREVIA_DEPLOY_CONCURRENCY` | Parallel BullMQ deploy workers (default 3; written from `previa.env` on setup/restart)          |
@@ -70,5 +70,9 @@ PREVIA_SEED_EMAIL=you@example.com PREVIA_SEED_PASSWORD=yourpassword previa setup
 ```
 
 On restart, if users already exist you are asked whether to reset a password or add another user; press **N** to keep the current accounts.
+
+## Docker volumes
+
+Postgres and Redis use **fixed** volume names (`deployer_deployer_pg`, `deployer_deployer_redis`) so renaming the install directory (`~/deployer` → `~/previa`) does not start a blank database. `docker compose down` never passes `-v`; data survives restarts.
 
 [← Back to README](../README.md)

@@ -16,7 +16,7 @@ if [[ -z "${PREVIA_STATE_DIR:-}" && -n "${DEPLOYER_STATE_DIR:-}" ]]; then
   PREVIA_STATE_DIR="$DEPLOYER_STATE_DIR"
 fi
 
-: "${PREVIA_WORK_ROOT:?Defina PREVIA_WORK_ROOT (ex: /home/previa)}"
+: "${PREVIA_WORK_ROOT:?Defina PREVIA_WORK_ROOT (ex: \$HOME/.local/share/previa)}"
 
 if [[ -z "${PREVIA_STATE_DIR:-}" ]]; then
   if [[ -d "${PREVIA_WORK_ROOT}/.previa-state" ]]; then

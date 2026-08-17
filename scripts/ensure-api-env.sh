@@ -93,16 +93,48 @@ if [[ -z "$cluster_secret" ]]; then
   cluster_secret="$(generate_jwt_secret)"
 fi
 
-work_root="$(get_env_var PREVIA_WORK_ROOT || true)"
+# True if we can write to dir, or create it under a writable ancestor.
+work_root_is_usable() {
+  local dir="$1"
+  [[ -n "$dir" ]] || return 1
+  if [[ -d "$dir" && -w "$dir" ]]; then
+    return 0
+  fi
+  local parent="$dir"
+  while [[ "$parent" != "/" ]]; do
+    parent="$(dirname "$parent")"
+    if [[ -d "$parent" ]]; then
+      [[ -w "$parent" ]] && return 0
+      return 1
+    fi
+  done
+  return 1
+}
+
+# Checkouts follow the current user, not a hardcoded /home/previa from .env.example.
+home_work_root() {
+  if [[ -d "${HOME}/.local/share/deployer" ]]; then
+    printf '%s' "${HOME}/.local/share/deployer"
+  else
+    printf '%s' "${HOME}/.local/share/previa"
+  fi
+}
+
+# previa.env (already sourced) wins when writable; else api/.env if writable;
+# else $HOME/.local/share/deployer (legacy checkouts) or .../previa.
+work_root="${PREVIA_WORK_ROOT:-}"
+if [[ -z "$work_root" ]]; then
+  work_root="$(get_env_var PREVIA_WORK_ROOT || true)"
+fi
 if [[ -z "$work_root" ]]; then
   work_root="$(get_env_var DEPLOYER_WORK_ROOT || true)"
 fi
-if [[ -z "$work_root" ]]; then
-  if [[ -d "${HOME}/.local/share/deployer" && ! -d "${HOME}/.local/share/previa" ]]; then
-    work_root="${HOME}/.local/share/deployer"
-  else
-    work_root="${HOME}/.local/share/previa"
+if ! work_root_is_usable "$work_root"; then
+  local_home_root="$(home_work_root)"
+  if [[ -n "$work_root" && "$work_root" != "$local_home_root" ]]; then
+    echo "[ensure-env] PREVIA_WORK_ROOT=${work_root} is not writable for $(id -un); using ${local_home_root}" >&2
   fi
+  work_root="$local_home_root"
 fi
 core_dir="${ROOT_DIR}/core"
 
@@ -137,4 +169,4 @@ elif [[ -z "$(get_env_var PREVIA_DEPLOY_CONCURRENCY || true)" ]]; then
   set_env_var PREVIA_DEPLOY_CONCURRENCY "3"
 fi
 
-echo "[ensure-env] api/.env updated (API :${API_PORT}, Postgres :${POSTGRES_PORT}, Redis :${REDIS_PORT}, Web :${WEB_PORT}, CORS :${cors_origin})"
+echo "[ensure-env] api/.env updated (API :${API_PORT}, Postgres :${POSTGRES_PORT}, Redis :${REDIS_PORT}, Web :${WEB_PORT}, CORS :${cors_origin}, WORK_ROOT :${work_root})"

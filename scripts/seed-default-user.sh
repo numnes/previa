@@ -63,9 +63,13 @@ if [[ -n "${PREVIA_SEED_EMAIL:-}" && -n "${PREVIA_SEED_PASSWORD:-}" ]]; then
   exit 0
 fi
 
-user_count="$(node "${ROOT_DIR}/scripts/seed-default-user.js" count 2>/dev/null || echo 0)"
+if ! user_count="$(node "${ROOT_DIR}/scripts/seed-default-user.js" count)"; then
+  echo "[seed-user] Could not list users (API or setup key). Not creating a new user." >&2
+  exit 1
+fi
 if [[ ! "$user_count" =~ ^[0-9]+$ ]]; then
-  user_count=0
+  echo "[seed-user] Unexpected user count: ${user_count}" >&2
+  exit 1
 fi
 
 if [[ "$user_count" -gt 0 ]]; then

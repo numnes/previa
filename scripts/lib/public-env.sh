@@ -9,6 +9,7 @@
 #     → pin host ports (skip auto-pick); fails if the port is already in use
 #   PREVIA_VERSION → shown in the dashboard sidebar (defaults to git describe)
 #   PREVIA_DEPLOY_CONCURRENCY → parallel BullMQ deploy jobs (default 3)
+#   PREVIA_WORK_ROOT → checkout root (default: ~/.local/share/deployer or ~/.local/share/previa)
 
 load_previa_public_env() {
   local root="${1:-}"
@@ -38,6 +39,7 @@ load_previa_public_env() {
   : "${PREVIA_REDIS_PORT:=${DEPLOYER_REDIS_PORT:-}}"
   : "${PREVIA_VERSION:=${DEPLOYER_VERSION:-}}"
   : "${PREVIA_DEPLOY_CONCURRENCY:=${DEPLOYER_DEPLOY_CONCURRENCY:-}}"
+  : "${PREVIA_WORK_ROOT:=${DEPLOYER_WORK_ROOT:-}}"
 }
 
 # True if value looks like a local-dev Origin (safe to rewrite on port changes).

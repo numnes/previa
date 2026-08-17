@@ -42,6 +42,10 @@ services:
       - postgres
       - redis
 
+# Nomes fixos: o prefixo do projeto Compose é o nome da pasta de instalação.
+# Sem `name:`, ~/deployer e ~/previa viram volumes diferentes e o Postgres sobe vazio.
 volumes:
   deployer_pg:
+    name: deployer_deployer_pg
   deployer_redis:
+    name: deployer_deployer_redis

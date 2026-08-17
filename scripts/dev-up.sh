@@ -6,11 +6,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${ROOT_DIR}/scripts/lib/ports.sh"
 # shellcheck source=lib/public-env.sh
 source "${ROOT_DIR}/scripts/lib/public-env.sh"
+# shellcheck source=lib/compose.sh
+source "${ROOT_DIR}/scripts/lib/compose.sh"
 load_previa_public_env "$ROOT_DIR"
 
 compose() {
-  # Project directory must be the install root (not the caller's cwd).
-  docker compose --project-directory "${ROOT_DIR}" -f "${ROOT_DIR}/docker-compose.dev.yml" "$@"
+  previa_compose "$@"
 }
 
 SPINNER_PID=""
@@ -149,6 +150,8 @@ else
 fi
 
 echo "[dev-up] Starting Postgres/Redis in Docker..."
+previa_stop_infra_containers
+previa_migrate_compose_volumes
 compose up -d postgres redis >/dev/null
 
 run_quiet "Rebuilding Previa web interface..." compose build web

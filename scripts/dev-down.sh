@@ -2,6 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/compose.sh
+source "${ROOT_DIR}/scripts/lib/compose.sh"
 
 echo "[dev-down] Stopping API in PM2..."
 if command -v pm2 >/dev/null 2>&1; then
@@ -16,7 +18,6 @@ echo "[dev-down] Stopping containers..."
 # Sempre no ROOT_DIR: se o cwd da shell ficou inacessível (SSH drop mid-restart),
 # `docker compose` falha com `stat .: permission denied`.
 cd "$ROOT_DIR"
-docker compose --project-directory "${ROOT_DIR}" -f "${ROOT_DIR}/docker-compose.dev.yml" down
-docker rm -f deployer-postgres deployer-redis deployer-web >/dev/null 2>&1 || true
+previa_stop_infra_containers
 
 echo "[dev-down] OK"
