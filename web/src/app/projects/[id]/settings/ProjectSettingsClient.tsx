@@ -51,6 +51,10 @@ export default function ProjectSettingsClient() {
   const [existenceLifetimeDays, setExistenceLifetimeDays] = useState('');
   const [existenceLifetimeHours, setExistenceLifetimeHours] = useState('');
   const [idlePauseMinutes, setIdlePauseMinutes] = useState('');
+  const [healthCheckPath, setHealthCheckPath] = useState('');
+  const [healthCheckStatus, setHealthCheckStatus] = useState('');
+  const [healthCheckTimeoutMinutes, setHealthCheckTimeoutMinutes] = useState('');
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [envVars, setEnvVars] = useState<EnvVarsMap>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -75,6 +79,14 @@ export default function ProjectSettingsClient() {
       setExistenceLifetimeDays(lifetimeFieldValue(p.maxExistenceLifetimeDays));
       setExistenceLifetimeHours(lifetimeFieldValue(p.maxExistenceLifetimeHours));
       setIdlePauseMinutes(lifetimeFieldValue(p.idlePauseMinutes));
+      setHealthCheckPath(p.healthCheckPath ?? '');
+      setHealthCheckStatus(
+        p.healthCheckStatus == null ? '' : String(p.healthCheckStatus),
+      );
+      setHealthCheckTimeoutMinutes(
+        p.healthCheckTimeoutMinutes == null ? '' : String(p.healthCheckTimeoutMinutes),
+      );
+      setNotificationsEnabled(!!p.notificationsEnabled);
       setEnvVars(normalizeEnvVars(p.envVars));
       setInstanceCount(instances.filter((i) => i.projectId === id).length);
     } catch {
@@ -165,6 +177,17 @@ export default function ProjectSettingsClient() {
                             .split(/[\n,]+/)
                             .map((s) => s.trim())
                             .filter(Boolean);
+                          const trimmedHealthPath = healthCheckPath.trim();
+                          const normalizedHealthPath =
+                            trimmedHealthPath === ''
+                              ? null
+                              : trimmedHealthPath.startsWith('/')
+                                ? trimmedHealthPath
+                                : `/${trimmedHealthPath}`;
+                          const parsedHealthStatus = parseLifetimeField(healthCheckStatus);
+                          const parsedHealthTimeout = parseLifetimeField(
+                            healthCheckTimeoutMinutes,
+                          );
                           const updated = await patchProject(id, {
                             gitUrl: trimmedGit,
                             serverUrl: trimmed === '' ? null : trimmed,
@@ -174,6 +197,14 @@ export default function ProjectSettingsClient() {
                             maxExistenceLifetimeDays: parseLifetimeField(existenceLifetimeDays),
                             maxExistenceLifetimeHours: parseLifetimeField(existenceLifetimeHours),
                             idlePauseMinutes: parseLifetimeField(idlePauseMinutes),
+                            healthCheckPath: normalizedHealthPath,
+                            healthCheckStatus: normalizedHealthPath
+                              ? parsedHealthStatus ?? 200
+                              : null,
+                            healthCheckTimeoutMinutes: normalizedHealthPath
+                              ? parsedHealthTimeout ?? 5
+                              : null,
+                            notificationsEnabled,
                           });
                           setProject(updated);
                           setGitUrl(updated.gitUrl);
@@ -188,6 +219,18 @@ export default function ProjectSettingsClient() {
                             lifetimeFieldValue(updated.maxExistenceLifetimeHours),
                           );
                           setIdlePauseMinutes(lifetimeFieldValue(updated.idlePauseMinutes));
+                          setHealthCheckPath(updated.healthCheckPath ?? '');
+                          setHealthCheckStatus(
+                            updated.healthCheckStatus == null
+                              ? ''
+                              : String(updated.healthCheckStatus),
+                          );
+                          setHealthCheckTimeoutMinutes(
+                            updated.healthCheckTimeoutMinutes == null
+                              ? ''
+                              : String(updated.healthCheckTimeoutMinutes),
+                          );
+                          setNotificationsEnabled(!!updated.notificationsEnabled);
                           setSaved(true);
                           router.refresh();
                         } catch {
@@ -348,6 +391,104 @@ export default function ProjectSettingsClient() {
                               />
                             </div>
                           </div>
+
+                          <div>
+                            <p className="text-sm text-white/70">Health check (optional)</p>
+                            <p className="mt-0.5 text-xs text-white/55">
+                              After deploy, Previa polls this HTTP path until it returns the
+                              expected status. Only then the instance becomes{' '}
+                              <span className="font-semibold">active</span>. If the timeout
+                              expires, the instance is paused and marked{' '}
+                              <span className="font-semibold">error</span> with the last runtime
+                              logs preserved. Leave path empty to keep the current behavior
+                              (active as soon as PM2/Docker is online).
+                            </p>
+                            <div className="mt-2 space-y-3 sm:max-w-md">
+                              <div>
+                                <label className="mb-1 block text-xs text-white/55">Path</label>
+                                <input
+                                  className="input font-mono text-sm"
+                                  value={healthCheckPath}
+                                  onChange={(e) => setHealthCheckPath(e.target.value)}
+                                  placeholder="/health"
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="mb-1 block text-xs text-white/55">
+                                    Expected HTTP status
+                                  </label>
+                                  <input
+                                    className="input"
+                                    type="number"
+                                    min={100}
+                                    max={599}
+                                    placeholder="200"
+                                    value={healthCheckStatus}
+                                    onChange={(e) => setHealthCheckStatus(e.target.value)}
+                                    disabled={!healthCheckPath.trim()}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-xs text-white/55">
+                                    Timeout (minutes)
+                                  </label>
+                                  <input
+                                    className="input"
+                                    type="number"
+                                    min={1}
+                                    max={120}
+                                    placeholder="5"
+                                    value={healthCheckTimeoutMinutes}
+                                    onChange={(e) =>
+                                      setHealthCheckTimeoutMinutes(e.target.value)
+                                    }
+                                    disabled={!healthCheckPath.trim()}
+                                  />
+                                </div>
+                              </div>
+                              <p className="text-xs text-white/55">
+                                Probed at{' '}
+                                <span className="font-mono text-white/75">
+                                  {'{serverUrl}/{project}/{branch}{path}'}
+                                </span>{' '}
+                                when Public URL is set; otherwise{' '}
+                                <span className="font-mono text-white/75">
+                                  http://127.0.0.1:{'{port}'}{'{path}'}
+                                </span>
+                                .
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-[#3d4048] pt-5">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <h2 className="text-sm font-medium text-[#e8eaed]">
+                              Discord notifications
+                            </h2>
+                            <p className="mt-1 text-xs text-[#8b919a]">
+                              When enabled, instance status changes for this project are sent to
+                              the Discord webhook configured in global Settings (if any).
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={notificationsEnabled}
+                            className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition ${
+                              notificationsEnabled ? 'bg-emerald-500/80' : 'bg-[#3d4048]'
+                            }`}
+                            onClick={() => setNotificationsEnabled((v) => !v)}
+                          >
+                            <span
+                              className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition ${
+                                notificationsEnabled ? 'translate-x-5' : 'translate-x-0'
+                              }`}
+                            />
+                          </button>
                         </div>
                       </div>
 

@@ -57,6 +57,24 @@ export class Project {
   @Column({ name: 'idle_pause_minutes', type: 'int', nullable: true })
   idlePauseMinutes: number | null;
 
+  /**
+   * Path relativo do health check (ex.: /health). null = desligado (comportamento legado).
+   */
+  @Column({ name: 'health_check_path', type: 'varchar', nullable: true })
+  healthCheckPath: string | null;
+
+  /** Status HTTP esperado do health check (default 200 quando path configurado). */
+  @Column({ name: 'health_check_status', type: 'int', nullable: true })
+  healthCheckStatus: number | null;
+
+  /** Minutos para aguardar health check OK antes de pausar e marcar error. */
+  @Column({ name: 'health_check_timeout_minutes', type: 'int', nullable: true })
+  healthCheckTimeoutMinutes: number | null;
+
+  /** Envia notificações Discord quando instâncias deste projeto mudam de status. */
+  @Column({ name: 'notifications_enabled', type: 'boolean', default: false })
+  notificationsEnabled: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

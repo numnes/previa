@@ -1,10 +1,21 @@
 import { apiBaseClient, httpJson } from '@/lib/http';
 import { getTokenClient } from '@/lib/client-auth';
 
+export type DiscordNotifyStatus =
+  | 'waiting'
+  | 'deploying'
+  | 'active'
+  | 'paused'
+  | 'error'
+  | 'deleted';
+
 export type SettingsPayload = {
   maxActiveInstancesParsed?: number;
   max_active_instances?: string;
   nodeLabel?: string;
+  discordWebhookUrl?: string;
+  discordNotifyStatuses?: DiscordNotifyStatus[];
+  discordMessageTemplate?: string;
   [key: string]: unknown;
 };
 
@@ -18,6 +29,9 @@ export async function fetchSettings(): Promise<SettingsPayload> {
 export async function patchSettings(body: {
   maxActiveInstances?: number;
   nodeLabel?: string;
+  discordWebhookUrl?: string;
+  discordNotifyStatuses?: DiscordNotifyStatus[];
+  discordMessageTemplate?: string;
 }): Promise<SettingsPayload> {
   const token = getTokenClient();
   return await httpJson<SettingsPayload>(`${apiBaseClient()}/settings`, {

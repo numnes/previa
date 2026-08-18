@@ -36,12 +36,29 @@ import { ProjectsService } from '../projects/projects.service';
 import { fetchPm2ByName, type Pm2Monit } from '../instances/pm2-list.helper';
 import { fetchDockerByName } from '../instances/docker-list.helper';
 import { SettingsService } from '../settings/settings.service';
+import {
+  DiscordNotificationsService,
+  type StatusChangeNotifyPayload,
+} from '../notifications/discord-notifications.service';
 import type { PreviewStatus } from './preview-status';
 import {
   computeActiveExpiresAt,
   computeExistenceExpiresAt,
   lifetimeDurationMs,
 } from './instance-lifetime.util';
+import {
+  buildHealthCheckUrl,
+  HEALTH_CHECK_POLL_INTERVAL_MS,
+  normalizeHealthCheckPath,
+  probeHealthCheckUrl,
+  resolveExpectedHealthStatus,
+  resolveHealthCheckTimeoutMinutes,
+  sleep,
+} from './health-check.util';
+import {
+  appendRuntimeLogsToError,
+  captureRuntimeLogs,
+} from './runtime-logs.helper';
 import { stat } from 'fs/promises';
 import { existsSync } from 'fs';
 
@@ -118,6 +135,7 @@ export class PreviewInstancesService {
     @Inject(forwardRef(() => ProjectsService))
     private readonly projects: ProjectsService,
     private readonly settings: SettingsService,
+    private readonly discordNotifications: DiscordNotificationsService,
     private readonly config: ConfigService,
     private readonly dataSource: DataSource,
     @InjectQueue('deploy')
@@ -159,6 +177,11 @@ export class PreviewInstancesService {
         newStatus,
       }),
     );
+    this.discordNotifications.notifyStatusChangeSafe({
+      instanceId,
+      oldStatus,
+      newStatus,
+    });
   }
 
   private async setStatus(row: PreviewInstance, next: PreviewStatus) {
@@ -197,8 +220,9 @@ export class PreviewInstancesService {
     const max = await this.settings.getMaxActiveInstances();
     const branchSlug = sanitizeBranchSlug(branch);
     const pm2Name = pm2AppName(projectSlug, branch);
+    const pendingNotifications: StatusChangeNotifyPayload[] = [];
 
-    return this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       await manager.query(
         `SELECT pg_advisory_xact_lock(hashtext('previa-slot-reserve'))`,
       );
@@ -235,6 +259,11 @@ export class PreviewInstancesService {
               newStatus: 'waiting',
             }),
           );
+          pendingNotifications.push({
+            instanceId: row.id,
+            oldStatus: null,
+            newStatus: 'waiting',
+          });
         } else if (row.status !== 'waiting') {
           const prev = row.status;
           row.branchSlug = branchSlug;
@@ -248,6 +277,11 @@ export class PreviewInstancesService {
               newStatus: 'waiting',
             }),
           );
+          pendingNotifications.push({
+            instanceId: row.id,
+            oldStatus: prev,
+            newStatus: 'waiting',
+          });
         } else {
           row.branchSlug = branchSlug;
           row.pm2Name = pm2Name;
@@ -278,6 +312,11 @@ export class PreviewInstancesService {
             newStatus: 'deploying',
           }),
         );
+        pendingNotifications.push({
+          instanceId: row.id,
+          oldStatus: null,
+          newStatus: 'deploying',
+        });
       } else {
         const prev = row.status;
         row.branchSlug = branchSlug;
@@ -294,12 +333,22 @@ export class PreviewInstancesService {
               newStatus: 'deploying',
             }),
           );
+          pendingNotifications.push({
+            instanceId: row.id,
+            oldStatus: prev,
+            newStatus: 'deploying',
+          });
         } else {
           await repo.save(row);
         }
       }
       return 'run';
     });
+
+    for (const payload of pendingNotifications) {
+      this.discordNotifications.notifyStatusChangeSafe(payload);
+    }
+    return result;
   }
 
   /** @deprecated use reserveDeployOrQueue */
@@ -357,7 +406,7 @@ export class PreviewInstancesService {
     return this.buildListItem(fresh as PreviewInstance, maps);
   }
 
-  async finalizeDeploySuccess(meta: DeployMeta): Promise<PreviewInstance> {
+  async persistDeployMeta(meta: DeployMeta): Promise<PreviewInstance> {
     const project = await this.projects.getBySlug(meta.projectSlug);
     const row = await this.repo.findOne({
       where: { projectId: project.id, branch: meta.branch },
@@ -370,9 +419,103 @@ export class PreviewInstancesService {
     row.port = meta.port;
     row.runner = meta.runner ?? 'pm2';
     row.lastDeployError = null;
+    row.idleSleep = false;
     await this.repo.save(row);
-    await this.setStatus(row, 'active');
-    return (await this.repo.findOne({ where: { id: row.id } })) as PreviewInstance;
+    return row;
+  }
+
+  /**
+   * Após deploy/resume: persiste metadados, aguarda health check (se configurado)
+   * e só então marca active. Em timeout, pausa runtime e marca error com logs.
+   */
+  async awaitHealthCheckAndFinalize(meta: DeployMeta): Promise<PreviewInstance> {
+    const project = await this.projects.getBySlug(meta.projectSlug);
+    const row = await this.persistDeployMeta(meta);
+    const healthPath = normalizeHealthCheckPath(project.healthCheckPath);
+
+    if (!healthPath) {
+      await this.setStatus(row, 'active');
+      return (await this.repo.findOne({ where: { id: row.id } })) as PreviewInstance;
+    }
+
+    const expectedStatus = resolveExpectedHealthStatus(project.healthCheckStatus);
+    const timeoutMinutes = resolveHealthCheckTimeoutMinutes(
+      project.healthCheckTimeoutMinutes,
+    );
+    const url = buildHealthCheckUrl(project, meta, healthPath);
+    const deadline = Date.now() + timeoutMinutes * 60_000;
+    let lastProbe = 'sem resposta';
+
+    this.log.log(
+      `Health check ${meta.projectSlug}/${meta.branch} → ${url} (HTTP ${expectedStatus}, ${timeoutMinutes} min)`,
+    );
+
+    while (Date.now() < deadline) {
+      const probe = await probeHealthCheckUrl(url, expectedStatus);
+      if (probe.ok) {
+        await this.setStatus(row, 'active');
+        return (await this.repo.findOne({ where: { id: row.id } })) as PreviewInstance;
+      }
+      lastProbe = probe.error ?? `HTTP ${probe.statusCode ?? '?'}`;
+      await sleep(HEALTH_CHECK_POLL_INTERVAL_MS);
+    }
+
+    await this.finalizeHealthCheckFailure(
+      project.slug,
+      row.branch,
+      meta,
+      url,
+      expectedStatus,
+      timeoutMinutes,
+      lastProbe,
+    );
+    throw new Error(
+      `Health check timeout após ${timeoutMinutes} min (${lastProbe})`,
+    );
+  }
+
+  async finalizeDeploySuccess(meta: DeployMeta): Promise<PreviewInstance> {
+    return this.awaitHealthCheckAndFinalize(meta);
+  }
+
+  private async finalizeHealthCheckFailure(
+    projectSlug: string,
+    branch: string,
+    meta: DeployMeta,
+    url: string,
+    expectedStatus: number,
+    timeoutMinutes: number,
+    lastProbe: string,
+  ): Promise<void> {
+    const project = await this.projects.getBySlug(projectSlug);
+    const row = await this.repo.findOne({
+      where: { projectId: project.id, branch },
+    });
+    if (!row) return;
+
+    const runtimeName = meta.pm2Name || row.pm2Name;
+    const runner = (meta.runner ?? row.runner ?? 'pm2') as 'pm2' | 'docker';
+    const logs = runtimeName
+      ? await captureRuntimeLogs(runtimeName, runner)
+      : '(runtime sem nome)';
+
+    const message =
+      `Health check não respondeu HTTP ${expectedStatus} em ${timeoutMinutes} min.\n` +
+      `URL: ${url}\n` +
+      `Última tentativa: ${lastProbe}`;
+
+    try {
+      await runCorePauseScript(this.config, projectSlug, branch);
+    } catch (e) {
+      const pauseErr = e instanceof Error ? e.message : String(e);
+      this.log.warn(`Pause após health check falhou (${projectSlug}/${branch}): ${pauseErr}`);
+    }
+
+    row.lastDeployError = appendRuntimeLogsToError(message, logs);
+    row.idleSleep = false;
+    await this.repo.save(row);
+    await this.setStatus(row, 'error');
+    await this.processWaitingQueue();
   }
 
   async finalizeDeployError(
@@ -735,7 +878,7 @@ export class PreviewInstancesService {
           row.branch,
           appEnv,
         );
-        await this.finalizeDeploySuccess(meta);
+        await this.awaitHealthCheckAndFinalize(meta);
       } else {
         // Docker: sem resume rápido — redeploy completo.
         const meta = await runCoreDeployScript(
@@ -746,11 +889,13 @@ export class PreviewInstancesService {
           undefined,
           appEnv,
         );
-        await this.finalizeDeploySuccess(meta);
+        await this.awaitHealthCheckAndFinalize(meta);
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      await this.finalizeDeployError(projectSlug, row.branch, msg);
+      if (!msg.includes('Health check timeout')) {
+        await this.finalizeDeployError(projectSlug, row.branch, msg);
+      }
       throw e;
     }
   }

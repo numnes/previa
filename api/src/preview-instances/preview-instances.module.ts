@@ -5,6 +5,7 @@ import { PreviewInstanceStatusEvent } from '../entities/preview-instance-status-
 import { PreviewInstance } from '../entities/preview-instance.entity';
 import { ProjectsModule } from '../projects/projects.module';
 import { SettingsModule } from '../settings/settings.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { InstanceLifetimeScheduler } from './instance-lifetime.scheduler';
 import { PreviewInstancesService } from './preview-instances.service';
 import { WakeController } from './wake.controller';
@@ -14,6 +15,7 @@ import { WakeController } from './wake.controller';
     TypeOrmModule.forFeature([PreviewInstance, PreviewInstanceStatusEvent]),
     forwardRef(() => ProjectsModule),
     SettingsModule,
+    NotificationsModule,
     BullModule.registerQueue({ name: 'deploy' }),
   ],
   controllers: [WakeController],

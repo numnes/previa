@@ -14,6 +14,12 @@ export type Project = {
   maxExistenceLifetimeHours: number | null;
   /** null/omit = disabled. Minutes without HTTP before idle sleep. */
   idlePauseMinutes?: number | null;
+  /** Relative HTTP path (e.g. /health). null = health check disabled. */
+  healthCheckPath?: string | null;
+  healthCheckStatus?: number | null;
+  healthCheckTimeoutMinutes?: number | null;
+  /** Discord instance status notifications for this project. */
+  notificationsEnabled?: boolean;
   envVars?: Record<string, string>;
   /** Extras além de PORT, SERVER_PORT, APP_PORT */
   portEnvNames?: string[];
@@ -60,6 +66,10 @@ export async function patchProject(
     maxExistenceLifetimeDays?: number | null;
     maxExistenceLifetimeHours?: number | null;
     idlePauseMinutes?: number | null;
+    healthCheckPath?: string | null;
+    healthCheckStatus?: number | null;
+    healthCheckTimeoutMinutes?: number | null;
+    notificationsEnabled?: boolean;
     envVars?: Record<string, string>;
     portEnvNames?: string[];
   },

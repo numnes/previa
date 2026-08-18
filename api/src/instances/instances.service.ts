@@ -5,6 +5,9 @@ import { promisify } from 'util';
 import { ClusterAggregatorService } from '../cluster/cluster-aggregator.service';
 import { parseRemoteId } from '../cluster/cluster.types';
 import {
+  extractStoredRuntimeLogs,
+} from '../preview-instances/runtime-logs.helper';
+import {
   PreviewInstancesService,
   type InstanceListItem,
 } from '../preview-instances/preview-instances.service';
@@ -118,7 +121,17 @@ export class InstancesService {
     if (name !== row.pm2Name) {
       throw new NotFoundException('Nome PM2 inválido');
     }
-    if (row.status !== 'active') {
+    if (row.status === 'error') {
+      const storedLogs = extractStoredRuntimeLogs(row.lastDeployError);
+      if (storedLogs) {
+        return {
+          pm2Name: name,
+          lines: safeLines,
+          output: storedLogs,
+        };
+      }
+    }
+    if (!['active', 'error', 'paused', 'deploying'].includes(row.status)) {
       return {
         pm2Name: name,
         lines: safeLines,

@@ -24,6 +24,7 @@ In **Projects → Settings**, you can set optional limits per project:
 | **Max active lifetime** (days / hours)    | While `active`, counts down; when it expires the instance is **paused** (runtime stopped, record kept)          |
 | **Max existence lifetime** (days / hours) | From creation; when it expires the instance is **destroyed** (PM2/Docker + nginx + DB record; checkout removed) |
 | **Idle pause** (minutes)                  | After N minutes without HTTP hits on the preview path, the instance is **slept** (nginx → wake endpoint). The next request, **Awake** in the dashboard, or a new `/deploy` (git fetch + rebuild) brings it back. Empty / 0 = off (default). |
+| **Health check** (optional)               | After deploy, poll an HTTP path until it returns the expected status (default **200**). Timeout (default **5** min) → runtime paused, status **error**, last logs kept. Empty path = legacy behavior (active when PM2/Docker is online). |
 
 The scheduler runs every minute. The **Instances** list and instance detail page show `activeExpiresAt` and `existenceExpiresAt` when limits apply.
 
@@ -35,7 +36,7 @@ Preview / ephemeral environment lifecycle:
 | ----------- | ---------------------------------------------------- |
 | `active`    | Running on the host (PM2 + nginx) — live review app  |
 | `waiting`   | Registered, waiting for a free slot (queued preview) |
-| `deploying` | Deploy job in progress                               |
+| `deploying` | Deploy job in progress (includes optional health check polling) |
 | `paused`    | Stopped on the host, still in the database           |
 | `error`     | Last deploy or activate failed                       |
 

@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ApiKeysSection } from './ApiKeysSection';
 import { ClusterSettingsSection } from './ClusterSettingsSection';
+import { DiscordNotificationsSection } from './DiscordNotificationsSection';
 import { fetchSettings, patchSettings } from './::handlers/settings';
 
 export default function SettingsPage() {
@@ -117,6 +118,7 @@ export default function SettingsPage() {
           </div>
 
           <div className="card space-y-8 p-5">
+            <DiscordNotificationsSection />
             <ApiKeysSection />
             <ClusterSettingsSection />
           </div>

@@ -2,11 +2,13 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsInt,
   IsObject,
   IsOptional,
   IsString,
   IsUrl,
+  Matches,
   Max,
   Min,
   MinLength,
@@ -117,4 +119,51 @@ export class UpdateProjectDto {
   @Min(0)
   @Max(10080)
   idlePauseMinutes?: number | null;
+
+  @ApiPropertyOptional({
+    example: '/health',
+    description:
+      'Path HTTP relativo para health check pós-deploy (ex.: /health). Vazio = desligado.',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v != null && String(v).trim() !== '')
+  @IsString()
+  @Matches(/^\/[\w./-]*$/, {
+    message: 'healthCheckPath deve começar com / (ex.: /health)',
+  })
+  healthCheckPath?: string | null;
+
+  @ApiPropertyOptional({
+    example: 200,
+    description: 'Status HTTP esperado do health check. Default 200 quando path configurado.',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v != null)
+  @Type(() => Number)
+  @IsInt()
+  @Min(100)
+  @Max(599)
+  healthCheckStatus?: number | null;
+
+  @ApiPropertyOptional({
+    example: 5,
+    description:
+      'Minutos aguardando health check OK após deploy antes de pausar e marcar error. Default 5.',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v != null)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(120)
+  healthCheckTimeoutMinutes?: number | null;
+
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'Quando true, instâncias deste projeto disparam notificações Discord configuradas globalmente.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  notificationsEnabled?: boolean;
 }

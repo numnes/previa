@@ -77,13 +77,16 @@ export class DeployProcessor extends WorkerHost {
         job.data.image,
         appEnv,
       );
-      await this.previewInstances.finalizeDeploySuccess(meta);
+      await this.previewInstances.awaitHealthCheckAndFinalize(meta);
     } catch (e) {
-      await this.previewInstances.finalizeDeployError(
-        job.data.projectSlug,
-        job.data.branch,
-        formatDeployError(e),
-      );
+      const msg = formatDeployError(e);
+      if (!msg.includes('Health check timeout')) {
+        await this.previewInstances.finalizeDeployError(
+          job.data.projectSlug,
+          job.data.branch,
+          msg,
+        );
+      }
       throw e;
     }
     await this.previewInstances.processWaitingQueue();

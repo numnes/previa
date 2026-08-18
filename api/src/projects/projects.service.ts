@@ -7,6 +7,7 @@ import {
 } from '../common/port-env-names.util';
 import { Project } from '../entities/project.entity';
 import { PreviewInstancesService } from '../preview-instances/preview-instances.service';
+import { normalizeHealthCheckPath } from '../preview-instances/health-check.util';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 
@@ -27,6 +28,10 @@ export class ProjectsService {
       envVars: {},
       portEnvNames: [],
       idlePauseMinutes: null,
+      healthCheckPath: null,
+      healthCheckStatus: null,
+      healthCheckTimeoutMinutes: null,
+      notificationsEnabled: false,
     });
     return this.repo.save(p);
   }
@@ -96,6 +101,24 @@ export class ProjectsService {
     if (dto.idlePauseMinutes !== undefined) {
       const n = dto.idlePauseMinutes;
       p.idlePauseMinutes = n == null || n === 0 ? null : n;
+    }
+    if (dto.healthCheckPath !== undefined) {
+      const normalized = normalizeHealthCheckPath(dto.healthCheckPath);
+      p.healthCheckPath = normalized;
+      if (!normalized) {
+        p.healthCheckStatus = null;
+        p.healthCheckTimeoutMinutes = null;
+      }
+    }
+    if (dto.healthCheckStatus !== undefined) {
+      p.healthCheckStatus = dto.healthCheckStatus;
+    }
+    if (dto.healthCheckTimeoutMinutes !== undefined) {
+      const n = dto.healthCheckTimeoutMinutes;
+      p.healthCheckTimeoutMinutes = n == null || n === 0 ? null : n;
+    }
+    if (dto.notificationsEnabled !== undefined) {
+      p.notificationsEnabled = dto.notificationsEnabled;
     }
     return this.repo.save(p);
   }
