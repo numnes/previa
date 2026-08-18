@@ -55,72 +55,86 @@ export default function SettingsPage() {
             subtitle="Global limits, API keys, node identity, and multi-machine cluster connections."
           />
 
-          <div className="card mb-5 p-5">
-            {loading ? (
-              <p className="text-sm text-white/60">Loading…</p>
-            ) : (
-              <form
-                className="space-y-4"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  setMsg(null);
-                  setSaving(true);
-                  try {
-                    const s = await patchSettings({
-                      maxActiveInstances: max,
-                      nodeLabel: nodeLabel.trim(),
-                    });
-                    setRaw(s as Record<string, unknown>);
-                    if (typeof s.maxActiveInstancesParsed === 'number') {
-                      setMax(s.maxActiveInstancesParsed);
-                    }
-                    if (typeof s.nodeLabel === 'string') {
-                      setNodeLabel(s.nodeLabel);
-                    }
-                    setMsg('Saved.');
-                  } catch {
-                    setMsg('Could not save.');
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-              >
-                <label className="block text-sm text-white/70">
-                  This node label
-                  <input
-                    className="input mt-1.5"
-                    value={nodeLabel}
-                    onChange={(e) => setNodeLabel(e.target.value)}
-                    placeholder="Machine A"
-                  />
-                </label>
-                <p className="text-xs text-white/55">
-                  Shown in the dashboard and instance lists when this panel aggregates multiple
-                  machines.
-                </p>
-                <label className="block text-sm text-white/70">
-                  Max active instances (this node)
-                  <input
-                    type="number"
-                    min={1}
-                    max={1000}
-                    className="input mt-1.5"
-                    value={max}
-                    onChange={(e) => setMax(Number(e.target.value))}
-                  />
-                </label>
-                {msg ? <p className="text-sm text-emerald-200/90">{msg}</p> : null}
-                <button type="submit" className="btn btn-primary" disabled={saving}>
-                  {saving ? 'Saving…' : 'Save'}
-                </button>
-              </form>
-            )}
-          </div>
+          <div className="space-y-5">
+            <div className="card p-5">
+              {loading ? (
+                <p className="text-sm text-white/60">Loading…</p>
+              ) : (
+                <>
+                  <h2 className="text-sm font-medium text-[#e8eaed]">This node</h2>
+                  <p className="mt-1 text-xs text-[#8b919a]">
+                    Identity and capacity limits for preview instances on this machine.
+                  </p>
+                  <form
+                    className="mt-4 space-y-4"
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      setMsg(null);
+                      setSaving(true);
+                      try {
+                        const s = await patchSettings({
+                          maxActiveInstances: max,
+                          nodeLabel: nodeLabel.trim(),
+                        });
+                        setRaw(s as Record<string, unknown>);
+                        if (typeof s.maxActiveInstancesParsed === 'number') {
+                          setMax(s.maxActiveInstancesParsed);
+                        }
+                        if (typeof s.nodeLabel === 'string') {
+                          setNodeLabel(s.nodeLabel);
+                        }
+                        setMsg('Saved.');
+                      } catch {
+                        setMsg('Could not save.');
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                  >
+                    <label className="block text-sm text-white/70">
+                      This node label
+                      <input
+                        className="input mt-1.5"
+                        value={nodeLabel}
+                        onChange={(e) => setNodeLabel(e.target.value)}
+                        placeholder="Machine A"
+                      />
+                    </label>
+                    <p className="text-xs text-white/55">
+                      Shown in the dashboard and instance lists when this panel aggregates multiple
+                      machines.
+                    </p>
+                    <label className="block text-sm text-white/70">
+                      Max active instances (this node)
+                      <input
+                        type="number"
+                        min={1}
+                        max={1000}
+                        className="input mt-1.5"
+                        value={max}
+                        onChange={(e) => setMax(Number(e.target.value))}
+                      />
+                    </label>
+                    {msg ? <p className="text-sm text-emerald-200/90">{msg}</p> : null}
+                    <button type="submit" className="btn btn-primary" disabled={saving}>
+                      {saving ? 'Saving…' : 'Save'}
+                    </button>
+                  </form>
+                </>
+              )}
+            </div>
 
-          <div className="card space-y-8 p-5">
-            <DiscordNotificationsSection />
-            <ApiKeysSection />
-            <ClusterSettingsSection />
+            <div className="card p-5">
+              <DiscordNotificationsSection />
+            </div>
+
+            <div className="card p-5">
+              <ApiKeysSection />
+            </div>
+
+            <div className="card p-5">
+              <ClusterSettingsSection />
+            </div>
           </div>
 
           {raw && !loading ? (

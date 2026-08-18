@@ -40,7 +40,7 @@ export function ApiKeysSection() {
   }, []);
 
   return (
-    <section className="border-t border-[#3d4048] pt-6">
+    <section>
       <h2 className="text-sm font-medium text-[#e8eaed]">API keys</h2>
       <p className="mt-1 text-xs text-[#8b919a]">
         Generate keys for GitHub Actions (header <span className="font-mono">X-Previa-Api-Key</span>).
