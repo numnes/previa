@@ -43,13 +43,17 @@ export function buildHealthCheckUrl(
     throw new Error('health check path inválido');
   }
 
+  if (meta.port != null && meta.port > 0) {
+    return `http://127.0.0.1:${meta.port}${path}`;
+  }
+
   const base = project.serverUrl?.replace(/\/$/, '');
   if (base) {
     const previewPath = previewUriPath(meta.projectSlug, meta.branch);
     return `${base}/${previewPath}${path}`;
   }
 
-  return `http://127.0.0.1:${meta.port}${path}`;
+  throw new Error('health check requer porta alocada ou serverUrl do projeto');
 }
 
 export type HealthProbeResult = {

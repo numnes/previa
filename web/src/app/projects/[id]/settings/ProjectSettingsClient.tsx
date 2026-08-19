@@ -559,7 +559,7 @@ export default function ProjectSettingsClient() {
                           onClick={async () => {
                             if (
                               !confirm(
-                                `Awake all idle-slept instances for "${project.slug}"?\n\nInstances resume one at a time. When health check is configured, the next starts only after the current one passes.`,
+                                `Awake all idle-slept instances for "${project.slug}"?\n\nInstances resume through the wake queue (concurrency follows PREVIA_DEPLOY_CONCURRENCY). When health check is configured, each wake waits until the instance is active before the slot is reused.`,
                               )
                             ) {
                               return;

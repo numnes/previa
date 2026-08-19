@@ -19,7 +19,7 @@ describe('health-check.util', () => {
     expect(resolveHealthCheckTimeoutMinutes(10)).toBe(10);
   });
 
-  it('builds nginx URL when serverUrl is set', () => {
+  it('prefers localhost when port is known (avoids nginx wake side effects)', () => {
     const url = buildHealthCheckUrl(
       { serverUrl: 'https://preview.example.com/' },
       {
@@ -28,6 +28,21 @@ describe('health-check.util', () => {
         branchSlug: 'feature-foo',
         pm2Name: 'my-app-feature-foo',
         port: 3005,
+      },
+      '/health',
+    );
+    expect(url).toBe('http://127.0.0.1:3005/health');
+  });
+
+  it('builds nginx URL when port is missing', () => {
+    const url = buildHealthCheckUrl(
+      { serverUrl: 'https://preview.example.com/' },
+      {
+        projectSlug: 'my-app',
+        branch: 'feature/foo',
+        branchSlug: 'feature-foo',
+        pm2Name: 'my-app-feature-foo',
+        port: 0,
       },
       '/health',
     );

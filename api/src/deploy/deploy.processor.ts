@@ -17,6 +17,8 @@ export type DeployJobPayload = {
   branch: string;
   gitUrl?: string;
   image?: string;
+  /** Explicit redeploy (webhook / Activate). When false/absent and instance is idle-sleep, resume instead. */
+  forceFullDeploy?: boolean;
 };
 
 @Processor('deploy', { concurrency: resolveDeployConcurrency() })
@@ -52,6 +54,24 @@ export class DeployProcessor extends WorkerHost {
   }
 
   async createAction(job: Job<DeployJobPayload>) {
+    const resumeOnly = await this.previewInstances.shouldResumeIdleSleepInsteadOfDeploy(
+      job.data.projectSlug,
+      job.data.branch,
+      job.data.forceFullDeploy,
+    );
+    if (resumeOnly) {
+      const branchSlug = await this.previewInstances.resolveBranchSlug(
+        job.data.projectSlug,
+        job.data.branch,
+      );
+      this.logger.log(
+        `Deploy job ${job.id} → idle-sleep resume ${job.data.projectSlug}/${job.data.branch}`,
+      );
+      await this.previewInstances.ensureAwake(job.data.projectSlug, branchSlug);
+      await this.previewInstances.processWaitingQueue();
+      return { ok: true, action: 'wake' };
+    }
+
     const reserved = await this.previewInstances.reserveDeployOrQueue(
       job.data.projectSlug,
       job.data.branch,

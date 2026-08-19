@@ -29,6 +29,7 @@ import {
   runCoreSleepScript,
   type DeployAppEnvInput,
 } from '../deploy/deploy-exec.helper';
+import { resolveDeployConcurrency } from '../deploy/deploy-concurrency.util';
 import { pm2AppName, sanitizeBranchSlug, previewUriPath } from '../deploy/pm2-name.util';
 import { PreviewInstance } from '../entities/preview-instance.entity';
 import { PreviewInstanceStatusEvent } from '../entities/preview-instance-status-event.entity';
@@ -125,8 +126,8 @@ export type InstanceListItem = {
 @Injectable()
 export class PreviewInstancesService {
   private readonly log = new Logger(PreviewInstancesService.name);
-  /** Fila serial de wake (idle sleep): uma instância por vez por nó. */
-  private readonly wakeQueue = new WakeQueue();
+  /** Fila de wake (idle sleep); concorrência = PREVIA_DEPLOY_CONCURRENCY. */
+  private readonly wakeQueue: WakeQueue;
 
   constructor(
     @InjectRepository(PreviewInstance)
@@ -141,15 +142,31 @@ export class PreviewInstancesService {
     private readonly dataSource: DataSource,
     @InjectQueue('deploy')
     private readonly deployQueue: Queue<DeployJobPayload>,
-  ) {}
+  ) {
+    const wakeConcurrency = resolveDeployConcurrency(
+      this.config.get<string>('PREVIA_DEPLOY_CONCURRENCY'),
+    );
+    this.wakeQueue = new WakeQueue(wakeConcurrency);
+    this.log.log(`Wake queue concurrency=${wakeConcurrency}`);
+  }
 
-  private async enqueueRedeployJob(projectSlug: string, branch: string, gitUrl: string) {
+  private async enqueueRedeployJob(
+    projectSlug: string,
+    branch: string,
+    gitUrl: string,
+    options?: { forceFullDeploy?: boolean },
+  ) {
     const branchSlug = sanitizeBranchSlug(branch);
     const jobId = `deploy:${projectSlug}:${branchSlug}`;
     try {
       await this.deployQueue.add(
         'create',
-        { projectSlug, branch, gitUrl },
+        {
+          projectSlug,
+          branch,
+          gitUrl,
+          forceFullDeploy: options?.forceFullDeploy,
+        },
         {
           jobId,
           removeOnComplete: true,
@@ -166,6 +183,53 @@ export class PreviewInstancesService {
       throw e;
     }
   }
+
+  /** Remove deploy BullMQ job waiting/active for this branch (not yet finished). */
+  async cancelPendingDeployJob(
+    projectSlug: string,
+    branch: string,
+  ): Promise<boolean> {
+    const branchSlug = sanitizeBranchSlug(branch);
+    const jobId = `deploy:${projectSlug}:${branchSlug}`;
+    const job = await this.deployQueue.getJob(jobId);
+    if (!job) return false;
+    const state = await job.getState();
+    if (state === 'active') {
+      this.log.debug(
+        `Deploy job ${jobId} already active — not cancelled on sleep`,
+      );
+      return false;
+    }
+    await job.remove();
+    this.log.log(`Deploy job ${jobId} cancelado (instância entrou em idle sleep)`);
+    return true;
+  }
+
+  async resolveBranchSlug(projectSlug: string, branch: string): Promise<string> {
+    const project = await this.projects.getBySlug(projectSlug);
+    const row = await this.repo.findOne({
+      where: { projectId: project.id, branch },
+    });
+    return row?.branchSlug ?? sanitizeBranchSlug(branch);
+  }
+
+  /**
+   * Deploy jobs enqueued before idle sleep should resume, not full-redeploy.
+   * Webhook / Activate pass forceFullDeploy=true to override.
+   */
+  async shouldResumeIdleSleepInsteadOfDeploy(
+    projectSlug: string,
+    branch: string,
+    forceFullDeploy?: boolean,
+  ): Promise<boolean> {
+    if (forceFullDeploy) return false;
+    const project = await this.projects.getBySlug(projectSlug);
+    const row = await this.repo.findOne({
+      where: { projectId: project.id, branch },
+    });
+    return row?.status === 'paused' && row.idleSleep === true;
+  }
+
   private async appendEvent(
     instanceId: string,
     oldStatus: string | null,
@@ -774,6 +838,7 @@ export class PreviewInstancesService {
     if (!row?.project) throw new NotFoundException();
     if (row.status !== 'active') return;
     await runCoreSleepScript(this.config, row.project.slug, row.branch);
+    await this.cancelPendingDeployJob(row.project.slug, row.branch);
     row.idleSleep = true;
     // Mantém row.port: a porta continua reservada no core (${name}.port) durante o sleep.
     await this.repo.save(row);
@@ -828,15 +893,16 @@ export class PreviewInstancesService {
   /**
    * Acorda instância em idle sleep (resume PM2 sem rebuild). Pedidos
    * concorrentes para a mesma branch compartilham o mesmo job; wakes de
-   * branches distintas entram numa fila serial e só avançam quando a
-   * instância anterior estiver active (inclui health check, se configurado).
+   * branches distintas entram numa fila com concorrência limitada por
+   * PREVIA_DEPLOY_CONCURRENCY; cada job só termina quando a instância está
+   * active (inclui health check, se configurado).
    */
   async ensureAwake(projectSlug: string, branchSlug: string): Promise<void> {
     const key = `${projectSlug}/${branchSlug}`;
     const queued = this.wakeQueue.pendingCount;
     if (queued > 0) {
       this.log.log(
-        `Wake ${key} enfileirado (posição ~${queued + 1} na fila serial)`,
+        `Wake ${key} enfileirado (~${queued + 1} na fila, concurrency=${this.wakeQueue.activeJobs + this.wakeQueue.pendingCount})`,
       );
     }
     await this.wakeQueue.enqueue(key, () => this.doWake(projectSlug, branchSlug));
@@ -941,6 +1007,7 @@ export class PreviewInstancesService {
         row.project.slug,
         row.branch,
         row.project.gitUrl,
+        { forceFullDeploy: true },
       );
     }
 

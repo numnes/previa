@@ -27,6 +27,7 @@ export class DeployService {
           branch,
           gitUrl: projectDocument.gitUrl,
           image,
+          forceFullDeploy: true,
         },
         { jobId, removeOnComplete: true, removeOnFail: true },
       );
