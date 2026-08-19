@@ -80,7 +80,7 @@ previa project init
 This copies:
 
 - `.github/workflows/deploy-preview.yml` — deploy on PR open/update
-- `.github/workflows/teardown-preview.yml` — remove preview on PR close
+- `.github/workflows/teardown-preview.yml` — remove preview on PR close or branch delete
 - `previa.yaml` — build commands and PM2 entrypoint for your stack
 
 The command detects `gitUrl` and `slug` when possible, asks for anything missing, embeds the project slug in the workflow files, and prints a **registration JSON** block:
@@ -138,7 +138,7 @@ The project slug is already set in the workflow files — no extra GitHub variab
 
 Edit `previa.yaml` for your build (install, build, start command / PM2 target). Then commit and push `.github/workflows/` and `previa.yaml`.
 
-Opening or updating a PR against a configured branch triggers a deploy; closing the PR runs teardown (if you kept the teardown workflow).
+Opening or updating a PR against a configured branch triggers a deploy; closing the PR or deleting the branch runs teardown (if you kept the teardown workflow).
 
 More detail: dashboard **Setup → GitHub Actions** and **Setup → Secrets**.
 

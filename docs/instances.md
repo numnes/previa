@@ -9,7 +9,7 @@ Ephemeral **preview URLs** for code review and QA before merge:
 - **Project / instance env vars** — optional defaults per project (Settings), overridable per instance; applied on create/redeploy (merge: checkout `.env` if present → `previa.yaml` `env:` → project → instance). PM2 starts with `cwd` = checkout root (so Nest/`dotenv` find `.env`) and injects the merged map into the process env; Docker via `--env-file`.
 - **Port env names** — on deploy, the allocated host port is written to `PORT`, `SERVER_PORT`, and `APP_PORT` by default. Add extras in **Project settings** or `previa.yaml` (`portEnvNames` / `portEnv`) when the app uses another variable name.
 - **Pause / awake / redeploy** — idle-slept instances get **Awake** (resume without git pull); manual pause uses **Activate / redeploy**. **Restart all instances** on a project still full-redeploys.
-- **Teardown on PR close** — optional workflow removes the instance automatically
+- **Teardown on PR close / branch delete** — optional workflow removes the instance automatically
 - **Bulk teardown** — **Projects → Settings → Teardown all instances** pauses every active instance for a project
 - **Bulk idle sleep / awake** — **Sleep all instances** puts every active instance into idle sleep (nginx wake); **Awake all instances** resumes idle-slept instances through the wake queue (concurrency **`PREVIA_DEPLOY_CONCURRENCY`**; health check gates each wake when configured)
 - **Delete project** — removes the project and destroys all its instances (PM2, nginx, database); checkout directory is removed from disk

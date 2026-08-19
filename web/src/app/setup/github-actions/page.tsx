@@ -43,7 +43,7 @@ export default function SetupGithubActionsPage() {
       <PageContainer>
         <PageHeader
           title="GitHub Actions"
-          subtitle="Workflows for deploy on PR open/update and teardown on close."
+          subtitle="Workflows for deploy on PR open/update and teardown on PR close or branch delete."
         />
         <div className="card p-5">
           <div className="space-y-8 text-sm text-[#b8bcc4]">

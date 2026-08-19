@@ -1,6 +1,7 @@
 # Copy to your app repo: .github/workflows/teardown-preview.yml
 # Repository secrets: PREVIA_API_URL, PREVIA_API_KEY (same as deploy)
 # PROJECT_SLUG is set by previa project init
+# Runs on PR close and when a branch is deleted on the remote (merge + delete branch, etc.)
 name: Teardown preview (previa)
 
 on:
@@ -9,10 +10,14 @@ on:
     branches:
       - master
       - homologation
+  delete:
 
 jobs:
   teardown-preview:
     runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'delete' && github.event.ref_type == 'branch')
     steps:
       - name: Remove preview instance
         env:
@@ -24,7 +29,12 @@ jobs:
             echo "Set repository secrets PREVIA_API_URL and PREVIA_API_KEY (or legacy DEPLOYER_*)."
             exit 1
           fi
-          BRANCH="${{ github.head_ref || github.ref_name }}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BRANCH="${{ github.head_ref }}"
+          else
+            BRANCH="${{ github.event.ref }}"
+            BRANCH="${BRANCH#refs/heads/}"
+          fi
           curl -fsS -X POST "${PREVIA_API_URL%/}/deploy/destroy" \
             -H "Content-Type: application/json" \
             -H "X-Previa-Api-Key: ${PREVIA_API_KEY}" \
