@@ -135,6 +135,16 @@ export class ProjectsService {
     return this.previewInstances.pauseAllActiveForProject(id);
   }
 
+  async sleepAllInstances(id: string) {
+    await this.findOne(id);
+    return this.previewInstances.sleepAllActiveForProject(id);
+  }
+
+  async awakeAllInstances(id: string) {
+    await this.findOne(id);
+    return this.previewInstances.awakeAllIdleForProject(id);
+  }
+
   async restartAllInstances(id: string) {
     await this.findOne(id);
     return this.previewInstances.restartAllForProject(id);

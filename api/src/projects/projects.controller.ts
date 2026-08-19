@@ -75,6 +75,24 @@ export class ProjectsController {
   }
 
   @ApiBearerAuth('jwt')
+  @ApiOkResponse({ description: 'Idle sleep em todas as instâncias active do projeto' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post(':id/instances/sleep')
+  sleepInstances(@Param('id', ParseUUIDPipe) id: string) {
+    return this.projects.sleepAllInstances(id);
+  }
+
+  @ApiBearerAuth('jwt')
+  @ApiOkResponse({ description: 'Acorda instâncias em idle sleep do projeto (fila serial)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post(':id/instances/awake')
+  awakeInstances(@Param('id', ParseUUIDPipe) id: string) {
+    return this.projects.awakeAllInstances(id);
+  }
+
+  @ApiBearerAuth('jwt')
   @ApiOkResponse({ description: 'Reinicia / redeploy de todas as instâncias do projeto' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')

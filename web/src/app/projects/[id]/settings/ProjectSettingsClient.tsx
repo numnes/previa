@@ -18,6 +18,8 @@ import {
   getProject,
   patchProject,
   restartProjectInstances,
+  sleepProjectInstances,
+  awakeProjectInstances,
   teardownProjectInstances,
   type Project,
 } from '../../::handlers/projects';
@@ -514,8 +516,72 @@ export default function ProjectSettingsClient() {
                       <h2 className="text-sm font-medium text-[#e8eaed]">Instances</h2>
                       <p className="mt-1 text-xs text-[#8b919a]">
                         Bulk actions for all instances registered under this project.
+                        <strong className="font-normal text-white/70"> Sleep</strong> uses idle
+                        sleep (wake on next HTTP request).{' '}
+                        <strong className="font-normal text-white/70">Teardown</strong> is manual
+                        pause (requires Activate / redeploy).
                       </p>
                       <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="btn text-sm"
+                          disabled={bulkLoading !== null || instanceCount === 0}
+                          onClick={async () => {
+                            if (
+                              !confirm(
+                                `Idle-sleep all active instances for "${project.slug}"?\n\nRuntime stops and nginx routes to the wake endpoint. The next HTTP request or Awake brings each instance back without rebuild.`,
+                              )
+                            ) {
+                              return;
+                            }
+                            setError(null);
+                            setActionMsg(null);
+                            setBulkLoading('sleep');
+                            try {
+                              const r = await sleepProjectInstances(id);
+                              setActionMsg(
+                                `Sleep done: ${r.slept ?? 0} slept, ${r.skipped ?? 0} skipped, ${r.failed ?? 0} failed.`,
+                              );
+                              router.refresh();
+                            } catch {
+                              setError('Could not sleep instances.');
+                            } finally {
+                              setBulkLoading(null);
+                            }
+                          }}
+                        >
+                          {bulkLoading === 'sleep' ? 'Working…' : 'Sleep all instances'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn text-sm"
+                          disabled={bulkLoading !== null || instanceCount === 0}
+                          onClick={async () => {
+                            if (
+                              !confirm(
+                                `Awake all idle-slept instances for "${project.slug}"?\n\nInstances resume one at a time. When health check is configured, the next starts only after the current one passes.`,
+                              )
+                            ) {
+                              return;
+                            }
+                            setError(null);
+                            setActionMsg(null);
+                            setBulkLoading('awake');
+                            try {
+                              const r = await awakeProjectInstances(id);
+                              setActionMsg(
+                                `Awake done: ${r.awoken ?? 0} awoken, ${r.skipped ?? 0} skipped, ${r.failed ?? 0} failed.`,
+                              );
+                              router.refresh();
+                            } catch {
+                              setError('Could not awake instances.');
+                            } finally {
+                              setBulkLoading(null);
+                            }
+                          }}
+                        >
+                          {bulkLoading === 'awake' ? 'Working…' : 'Awake all instances'}
+                        </button>
                         <button
                           type="button"
                           className="btn text-sm"

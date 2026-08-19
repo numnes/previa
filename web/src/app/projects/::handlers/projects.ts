@@ -92,6 +92,8 @@ export type ProjectBulkResult = {
   paused?: number;
   skipped?: number;
   restarted?: number;
+  slept?: number;
+  awoken?: number;
   instances?: { destroyed: number; failed: number };
 };
 
@@ -118,6 +120,28 @@ export async function restartProjectInstances(id: string): Promise<ProjectBulkRe
   const token = getTokenClient();
   return await httpJson<ProjectBulkResult>(
     `${apiBaseClient()}/projects/${id}/instances/restart`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
+}
+
+export async function sleepProjectInstances(id: string): Promise<ProjectBulkResult> {
+  const token = getTokenClient();
+  return await httpJson<ProjectBulkResult>(
+    `${apiBaseClient()}/projects/${id}/instances/sleep`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
+}
+
+export async function awakeProjectInstances(id: string): Promise<ProjectBulkResult> {
+  const token = getTokenClient();
+  return await httpJson<ProjectBulkResult>(
+    `${apiBaseClient()}/projects/${id}/instances/awake`,
     {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },

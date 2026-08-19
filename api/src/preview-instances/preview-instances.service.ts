@@ -59,6 +59,7 @@ import {
   appendRuntimeLogsToError,
   captureRuntimeLogs,
 } from './runtime-logs.helper';
+import { WakeQueue } from './wake-queue';
 import { stat } from 'fs/promises';
 import { existsSync } from 'fs';
 
@@ -124,8 +125,8 @@ export type InstanceListItem = {
 @Injectable()
 export class PreviewInstancesService {
   private readonly log = new Logger(PreviewInstancesService.name);
-  /** Dedup wake concurrentes por project/branchSlug. */
-  private readonly wakeInflight = new Map<string, Promise<void>>();
+  /** Fila serial de wake (idle sleep): uma instância por vez por nó. */
+  private readonly wakeQueue = new WakeQueue();
 
   constructor(
     @InjectRepository(PreviewInstance)
@@ -825,21 +826,20 @@ export class PreviewInstancesService {
   }
 
   /**
-   * Acorda instância em idle sleep (resume PM2 sem rebuild). Concurrent requests
-   * compartilham a mesma Promise.
+   * Acorda instância em idle sleep (resume PM2 sem rebuild). Pedidos
+   * concorrentes para a mesma branch compartilham o mesmo job; wakes de
+   * branches distintas entram numa fila serial e só avançam quando a
+   * instância anterior estiver active (inclui health check, se configurado).
    */
   async ensureAwake(projectSlug: string, branchSlug: string): Promise<void> {
     const key = `${projectSlug}/${branchSlug}`;
-    const existing = this.wakeInflight.get(key);
-    if (existing) {
-      await existing;
-      return;
+    const queued = this.wakeQueue.pendingCount;
+    if (queued > 0) {
+      this.log.log(
+        `Wake ${key} enfileirado (posição ~${queued + 1} na fila serial)`,
+      );
     }
-    const run = this.doWake(projectSlug, branchSlug).finally(() => {
-      this.wakeInflight.delete(key);
-    });
-    this.wakeInflight.set(key, run);
-    await run;
+    await this.wakeQueue.enqueue(key, () => this.doWake(projectSlug, branchSlug));
   }
 
   private async doWake(projectSlug: string, branchSlug: string): Promise<void> {
@@ -1006,6 +1006,65 @@ export class PreviewInstancesService {
       await this.processWaitingQueue();
     }
     return { paused, skipped, failed };
+  }
+
+  /** Idle sleep em todas as instâncias active do projeto (nginx → wake). */
+  async sleepAllActiveForProject(projectId: string): Promise<{
+    slept: number;
+    skipped: number;
+    failed: number;
+  }> {
+    const rows = await this.findAllByProjectId(projectId);
+    let slept = 0;
+    let skipped = 0;
+    let failed = 0;
+    for (const row of rows) {
+      if (row.status !== 'active') {
+        skipped++;
+        continue;
+      }
+      try {
+        await this.sleepInstanceForIdle(row.id);
+        slept++;
+      } catch (e) {
+        failed++;
+        const msg = e instanceof Error ? e.message : String(e);
+        this.log.warn(`idle sleep ${row.id}: ${msg}`);
+      }
+    }
+    if (slept > 0) {
+      await this.processWaitingQueue();
+    }
+    return { slept, skipped, failed };
+  }
+
+  /** Resume idle-slept instances one at a time (serial wake queue). */
+  async awakeAllIdleForProject(projectId: string): Promise<{
+    awoken: number;
+    skipped: number;
+    failed: number;
+  }> {
+    const rows = await this.findAllByProjectId(projectId);
+    let awoken = 0;
+    let skipped = 0;
+    let failed = 0;
+    for (const row of rows) {
+      if (row.status !== 'paused' || !row.idleSleep || !row.project) {
+        skipped++;
+        continue;
+      }
+      try {
+        await this.ensureAwake(row.project.slug, row.branchSlug);
+        awoken++;
+      } catch (e) {
+        failed++;
+        const msg = e instanceof Error ? e.message : String(e);
+        this.log.warn(
+          `awake ${row.project.slug}/${row.branchSlug}: ${msg}`,
+        );
+      }
+    }
+    return { awoken, skipped, failed };
   }
 
   async restartAllForProject(projectId: string): Promise<{
