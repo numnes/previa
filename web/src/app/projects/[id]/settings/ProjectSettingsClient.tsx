@@ -159,6 +159,7 @@ export default function ProjectSettingsClient() {
                     {actionMsg ? <div className="alert-success mb-3">{actionMsg}</div> : null}
 
                     <form
+                      id="project-general-settings"
                       className="space-y-4"
                       onSubmit={async (e) => {
                         e.preventDefault();
@@ -491,13 +492,23 @@ export default function ProjectSettingsClient() {
                           </button>
                         </div>
                       </div>
-
-                      <div className="flex gap-3">
-                        <button className="btn btn-primary" type="submit" disabled={saving}>
-                          {saving ? 'Saving…' : 'Save'}
-                        </button>
-                      </div>
                     </form>
+
+                    <div className="mt-8 border-t border-[#3d4048] pt-6">
+                      <h2 className="text-sm font-medium text-[#e8eaed]">Save settings</h2>
+                      <p className="mt-1 text-xs text-[#8b919a]">
+                        Writes Git URL, public URL, lifetime, health check, and Discord
+                        notification settings for this project.
+                      </p>
+                      <button
+                        className="btn btn-primary mt-4"
+                        type="submit"
+                        form="project-general-settings"
+                        disabled={saving}
+                      >
+                        {saving ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
 
                     <div className="mt-8 border-t border-[#3d4048] pt-6">
                       <h2 className="text-sm font-medium text-[#e8eaed]">Instances</h2>

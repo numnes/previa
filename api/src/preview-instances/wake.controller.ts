@@ -49,6 +49,7 @@ export class WakeController {
     const redirectTo = `${proto}://${host}${uri.startsWith('/') ? uri : `/${uri}`}`;
 
     try {
+      this.log.log(`Wake request ${projectSlug}/${branchSlug} → ${uri}`);
       await this.previewInstances.ensureAwake(projectSlug, branchSlug);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

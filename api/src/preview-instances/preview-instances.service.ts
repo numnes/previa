@@ -563,6 +563,11 @@ export class PreviewInstancesService {
         next.project.gitUrl,
       );
     }
+    if (waiting.length > 0) {
+      this.log.log(
+        `Waiting queue: enfileirados ${waiting.length} deploy(s) (${free} vaga(s) livre(s))`,
+      );
+    }
   }
 
   async upsertAfterDeploy(meta: DeployMeta): Promise<PreviewInstance> {
@@ -597,7 +602,10 @@ export class PreviewInstancesService {
    * - Registra evento `deleted` e remove a linha
    * - Processa a fila waiting ao liberar vaga
    */
-  async destroyInstanceById(id: string): Promise<void> {
+  async destroyInstanceById(
+    id: string,
+    options?: { processQueue?: boolean },
+  ): Promise<void> {
     const row = await this.repo.findOne({ where: { id }, relations: ['project'] });
     if (!row || !row.project) {
       throw new NotFoundException(`Instância "${id}" não encontrada`);
@@ -617,7 +625,9 @@ export class PreviewInstancesService {
     await execFileAsync(script, [row.project.slug, row.branch], { env });
     await this.appendEvent(row.id, row.status, 'deleted');
     await this.repo.delete({ id: row.id });
-    await this.processWaitingQueue();
+    if (options?.processQueue !== false) {
+      await this.processWaitingQueue();
+    }
   }
 
   /** Busca o estado de runtime (pm2 + docker) em paralelo. */
@@ -728,7 +738,10 @@ export class PreviewInstancesService {
     return this.repo.findOne({ where: { id } });
   }
 
-  async pauseInstance(id: string): Promise<InstanceListItem> {
+  async pauseInstance(
+    id: string,
+    options?: { processQueue?: boolean },
+  ): Promise<InstanceListItem> {
     const row = await this.repo.findOne({
       where: { id },
       relations: ['project'],
@@ -741,7 +754,9 @@ export class PreviewInstancesService {
     row.idleSleep = false;
     await this.repo.save(row);
     await this.setStatus(row, 'paused');
-    await this.processWaitingQueue();
+    if (options?.processQueue !== false) {
+      await this.processWaitingQueue();
+    }
     const maps = await this.fetchRuntimeMaps();
     const fresh = await this.repo.findOne({ where: { id }, relations: ['project'] });
     return this.buildListItem(fresh as PreviewInstance, maps);
@@ -762,7 +777,6 @@ export class PreviewInstancesService {
     // Mantém row.port: a porta continua reservada no core (${name}.port) durante o sleep.
     await this.repo.save(row);
     await this.setStatus(row, 'paused');
-    await this.processWaitingQueue();
   }
 
   private activityLogPath(projectSlug: string, branchSlug: string): string {
@@ -980,13 +994,16 @@ export class PreviewInstancesService {
         continue;
       }
       try {
-        await this.pauseInstance(row.id);
+        await this.pauseInstance(row.id, { processQueue: false });
         paused++;
       } catch (e) {
         failed++;
         const msg = e instanceof Error ? e.message : String(e);
         this.log.warn(`pause ${row.id}: ${msg}`);
       }
+    }
+    if (paused > 0) {
+      await this.processWaitingQueue();
     }
     return { paused, skipped, failed };
   }
@@ -1046,7 +1063,7 @@ export class PreviewInstancesService {
         const age = now - row.createdAt.getTime();
         if (age >= existenceMs) {
           try {
-            await this.destroyInstanceById(row.id);
+            await this.destroyInstanceById(row.id, { processQueue: false });
             destroyed++;
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
@@ -1068,7 +1085,7 @@ export class PreviewInstancesService {
         const activeSince = (row.activatedAt ?? row.updatedAt).getTime();
         if (now - activeSince >= activeMs) {
           try {
-            await this.pauseInstance(row.id);
+            await this.pauseInstance(row.id, { processQueue: false });
             paused++;
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
@@ -1095,6 +1112,10 @@ export class PreviewInstancesService {
           );
         }
       }
+    }
+
+    if (idleSlept > 0 || paused > 0 || destroyed > 0) {
+      await this.processWaitingQueue();
     }
 
     return { paused, destroyed, idleSlept };
