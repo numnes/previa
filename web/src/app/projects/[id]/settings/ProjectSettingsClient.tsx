@@ -57,6 +57,7 @@ export default function ProjectSettingsClient() {
   const [healthCheckStatus, setHealthCheckStatus] = useState('');
   const [healthCheckTimeoutMinutes, setHealthCheckTimeoutMinutes] = useState('');
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [clickupCommentsEnabled, setClickupCommentsEnabled] = useState(false);
   const [envVars, setEnvVars] = useState<EnvVarsMap>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -89,6 +90,7 @@ export default function ProjectSettingsClient() {
         p.healthCheckTimeoutMinutes == null ? '' : String(p.healthCheckTimeoutMinutes),
       );
       setNotificationsEnabled(!!p.notificationsEnabled);
+      setClickupCommentsEnabled(!!p.clickupCommentsEnabled);
       setEnvVars(normalizeEnvVars(p.envVars));
       setInstanceCount(instances.filter((i) => i.projectId === id).length);
     } catch {
@@ -208,6 +210,7 @@ export default function ProjectSettingsClient() {
                               ? parsedHealthTimeout ?? 5
                               : null,
                             notificationsEnabled,
+                            clickupCommentsEnabled,
                           });
                           setProject(updated);
                           setGitUrl(updated.gitUrl);
@@ -234,6 +237,7 @@ export default function ProjectSettingsClient() {
                               : String(updated.healthCheckTimeoutMinutes),
                           );
                           setNotificationsEnabled(!!updated.notificationsEnabled);
+                          setClickupCommentsEnabled(!!updated.clickupCommentsEnabled);
                           setSaved(true);
                           router.refresh();
                         } catch {
@@ -494,13 +498,44 @@ export default function ProjectSettingsClient() {
                           </button>
                         </div>
                       </div>
+
+                      <div className="border-t border-[#3d4048] pt-5">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <h2 className="text-sm font-medium text-[#e8eaed]">
+                              ClickUp preview comments
+                            </h2>
+                            <p className="mt-1 text-xs text-[#8b919a]">
+                              When the instance first becomes active, comment on the ClickUp task
+                              whose ID matches the branch name (e.g.{' '}
+                              <span className="font-mono">cicm-4491</span>). Uses the token and
+                              workspace ID from global Settings. Requires Public URL.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={clickupCommentsEnabled}
+                            className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition ${
+                              clickupCommentsEnabled ? 'bg-emerald-500/80' : 'bg-[#3d4048]'
+                            }`}
+                            onClick={() => setClickupCommentsEnabled((v) => !v)}
+                          >
+                            <span
+                              className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition ${
+                                clickupCommentsEnabled ? 'translate-x-5' : 'translate-x-0'
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      </div>
                     </form>
 
                     <div className="mt-8 border-t border-[#3d4048] pt-6">
                       <h2 className="text-sm font-medium text-[#e8eaed]">Save settings</h2>
                       <p className="mt-1 text-xs text-[#8b919a]">
-                        Writes Git URL, public URL, lifetime, health check, and Discord
-                        notification settings for this project.
+                        Writes Git URL, public URL, lifetime, health check, Discord, and ClickUp
+                        settings for this project.
                       </p>
                       <button
                         className="btn btn-primary mt-4"

@@ -61,7 +61,10 @@ export async function removeInstance(id: string): Promise<{ ok: true }> {
 
 export async function patchInstance(
   id: string,
-  body: { envVars?: Record<string, string> },
+  body: {
+    envVars?: Record<string, string>;
+    clickupTaskUrl?: string | null;
+  },
 ): Promise<InstanceRow> {
   const token = getTokenClient();
   return await httpJson<InstanceRow>(`${apiBaseClient()}/instances/${id}`, {

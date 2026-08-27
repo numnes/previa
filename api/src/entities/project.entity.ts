@@ -75,6 +75,10 @@ export class Project {
   @Column({ name: 'notifications_enabled', type: 'boolean', default: false })
   notificationsEnabled: boolean;
 
+  /** Comenta no ClickUp (task id = nome da branch) quando a preview fica active. */
+  @Column({ name: 'clickup_comments_enabled', type: 'boolean', default: false })
+  clickupCommentsEnabled: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

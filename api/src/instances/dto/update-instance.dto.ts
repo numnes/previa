@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsObject, IsOptional } from 'class-validator';
+import { IsObject, IsOptional, IsString, ValidateIf } from 'class-validator';
 
 export class UpdateInstanceDto {
   @ApiPropertyOptional({
@@ -10,4 +10,14 @@ export class UpdateInstanceDto {
   @IsOptional()
   @IsObject()
   envVars?: Record<string, string>;
+
+  @ApiPropertyOptional({
+    example: 'https://app.clickup.com/t/CICM-4491',
+    description:
+      'URL ou ID da tarefa ClickUp. null/string vazia remove o vínculo manual. Não posta comentário — só exibe link e status.',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v != null)
+  @IsString()
+  clickupTaskUrl?: string | null;
 }

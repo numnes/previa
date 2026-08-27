@@ -57,6 +57,8 @@ export default function InstanceDetailClient() {
   const [envVars, setEnvVars] = useState<EnvVarsMap>({});
   const [envSaving, setEnvSaving] = useState(false);
   const [envSaved, setEnvSaved] = useState(false);
+  const [clickupInput, setClickupInput] = useState('');
+  const [clickupSaving, setClickupSaving] = useState(false);
   const actionLock = useRef(false);
 
   const statusBusy = statusAction !== null;
@@ -66,6 +68,7 @@ export default function InstanceDetailClient() {
     const data = await getInstance(id);
     setRow(data);
     setEnvVars(normalizeEnvVars(data.envVars));
+    setClickupInput(data.clickupManualLink ? data.clickupTaskUrl ?? '' : '');
     return data;
   }, [id]);
 
@@ -602,6 +605,123 @@ export default function InstanceDetailClient() {
                           ) : (
                             <span className="text-white/45">—</span>
                           )}
+                        </dd>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <dt className="text-white/55">ClickUp task</dt>
+                        <dd className="mt-1 space-y-2">
+                          {row.clickupTaskUrl || row.clickupTaskStatus || row.clickupTaskId ? (
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                              {row.clickupTaskUrl ? (
+                                <Link
+                                  className="break-all text-sky-200/90 underline-offset-2 hover:underline"
+                                  href={row.clickupTaskUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  {row.clickupTaskId ?? row.clickupTaskUrl}
+                                </Link>
+                              ) : row.clickupTaskId ? (
+                                <span className="font-mono text-white/80">{row.clickupTaskId}</span>
+                              ) : null}
+                              {row.clickupTaskStatus ? (
+                                <span className="rounded border border-white/15 bg-black/25 px-2 py-0.5 text-xs text-white/75">
+                                  {row.clickupTaskStatus}
+                                </span>
+                              ) : null}
+                              {row.clickupManualLink ? (
+                                <span className="text-xs text-white/45">manual link</span>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-white/45">
+                              No task linked. Branch names like{' '}
+                              <span className="font-mono">cicm-4491</span> are matched
+                              automatically when ClickUp is configured.
+                            </p>
+                          )}
+                          {row.isLocal && admin ? (
+                            <div className="mt-2 max-w-xl space-y-2">
+                              <label className="block text-xs text-white/55">
+                                Force link (paste ClickUp URL or task ID)
+                                <input
+                                  className="input mt-1 font-mono text-sm"
+                                  value={clickupInput}
+                                  onChange={(e) => setClickupInput(e.target.value)}
+                                  placeholder="https://app.clickup.com/t/CICM-4491"
+                                  disabled={clickupSaving || statusBusy}
+                                />
+                              </label>
+                              <p className="text-xs text-white/45">
+                                Manual links only show the task URL and status — Previa will not
+                                post a preview comment on that task.
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  className="btn btn-primary text-sm"
+                                  disabled={clickupSaving || statusBusy}
+                                  onClick={async () => {
+                                    setClickupSaving(true);
+                                    setError(null);
+                                    try {
+                                      const updated = await patchInstance(id, {
+                                        clickupTaskUrl: clickupInput.trim() || null,
+                                      });
+                                      setRow(updated);
+                                      setClickupInput(
+                                        updated.clickupManualLink
+                                          ? updated.clickupTaskUrl ?? ''
+                                          : '',
+                                      );
+                                      toast.push({
+                                        title: updated.clickupManualLink
+                                          ? 'ClickUp task linked'
+                                          : 'ClickUp link cleared',
+                                        variant: 'success',
+                                      });
+                                    } catch {
+                                      setError(
+                                        'Could not link ClickUp task. Check the URL and API token in Settings.',
+                                      );
+                                    } finally {
+                                      setClickupSaving(false);
+                                    }
+                                  }}
+                                >
+                                  {clickupSaving ? 'Saving…' : 'Save ClickUp link'}
+                                </button>
+                                {row.clickupManualLink ? (
+                                  <button
+                                    type="button"
+                                    className="btn text-sm"
+                                    disabled={clickupSaving || statusBusy}
+                                    onClick={async () => {
+                                      setClickupSaving(true);
+                                      setError(null);
+                                      try {
+                                        const updated = await patchInstance(id, {
+                                          clickupTaskUrl: null,
+                                        });
+                                        setRow(updated);
+                                        setClickupInput('');
+                                        toast.push({
+                                          title: 'ClickUp link cleared',
+                                          variant: 'success',
+                                        });
+                                      } catch {
+                                        setError('Could not clear ClickUp link.');
+                                      } finally {
+                                        setClickupSaving(false);
+                                      }
+                                    }}
+                                  >
+                                    Clear
+                                  </button>
+                                ) : null}
+                              </div>
+                            </div>
+                          ) : null}
                         </dd>
                       </div>
                       <div>

@@ -20,6 +20,7 @@ export type Project = {
   healthCheckTimeoutMinutes?: number | null;
   /** Discord instance status notifications for this project. */
   notificationsEnabled?: boolean;
+  clickupCommentsEnabled?: boolean;
   envVars?: Record<string, string>;
   /** Extras além de PORT, SERVER_PORT, APP_PORT */
   portEnvNames?: string[];
@@ -70,6 +71,7 @@ export async function patchProject(
     healthCheckStatus?: number | null;
     healthCheckTimeoutMinutes?: number | null;
     notificationsEnabled?: boolean;
+    clickupCommentsEnabled?: boolean;
     envVars?: Record<string, string>;
     portEnvNames?: string[];
   },

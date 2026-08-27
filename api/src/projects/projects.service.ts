@@ -32,6 +32,7 @@ export class ProjectsService {
       healthCheckStatus: null,
       healthCheckTimeoutMinutes: null,
       notificationsEnabled: false,
+      clickupCommentsEnabled: false,
     });
     return this.repo.save(p);
   }
@@ -119,6 +120,9 @@ export class ProjectsService {
     }
     if (dto.notificationsEnabled !== undefined) {
       p.notificationsEnabled = dto.notificationsEnabled;
+    }
+    if (dto.clickupCommentsEnabled !== undefined) {
+      p.clickupCommentsEnabled = dto.clickupCommentsEnabled;
     }
     return this.repo.save(p);
   }

@@ -61,6 +61,31 @@ export class PreviewInstance {
   @Column({ name: 'idle_sleep', type: 'boolean', default: false })
   idleSleep: boolean;
 
+  /** Comentário ClickUp já enviado para esta instância (evita spam no wake). */
+  @Column({ name: 'clickup_commented_at', type: 'timestamptz', nullable: true })
+  clickupCommentedAt: Date | null;
+
+  /**
+   * Task ID (custom ou interno) vinculado à instância.
+   * Preenchido por override manual ou resolvido a partir do nome da branch.
+   */
+  @Column({ name: 'clickup_task_id', type: 'varchar', nullable: true })
+  clickupTaskId: string | null;
+
+  /** URL da tarefa no ClickUp (colada ou retornada pela API). */
+  @Column({ name: 'clickup_task_url', type: 'varchar', nullable: true })
+  clickupTaskUrl: string | null;
+
+  /** Status em texto da tarefa (cache; atualizado no detalhe / ao vincular). */
+  @Column({ name: 'clickup_task_status', type: 'varchar', nullable: true })
+  clickupTaskStatus: string | null;
+
+  /**
+   * true = vínculo manual (URL colada): mostra link/status, nunca comenta automaticamente.
+   */
+  @Column({ name: 'clickup_manual_link', type: 'boolean', default: false })
+  clickupManualLink: boolean;
+
   /**
    * Override de env por instância (sobrescreve as do projeto no merge do deploy).
    * Objeto vazio = sem override.

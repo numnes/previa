@@ -166,4 +166,13 @@ export class UpdateProjectDto {
   @IsOptional()
   @IsBoolean()
   notificationsEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'Quando true, o primeiro active da instância comenta no ClickUp na tarefa cujo id coincide com o nome da branch.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  clickupCommentsEnabled?: boolean;
 }

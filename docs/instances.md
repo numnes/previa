@@ -26,6 +26,7 @@ In **Projects → Settings**, you can set optional limits per project:
 | **Max existence lifetime** (days / hours) | From creation; when it expires the instance is **destroyed** (PM2/Docker + nginx + DB record; checkout removed) |
 | **Idle pause** (minutes)                  | After N minutes without HTTP hits on the preview path, the instance is **slept** (nginx → wake endpoint). The next request, **Awake** in the dashboard, or a new `/deploy` (git fetch + rebuild) brings it back. Wakes from idle sleep run with concurrency **`PREVIA_DEPLOY_CONCURRENCY`** (default 3); each wake finishes when the instance is **active** (health check must pass when configured). Empty / 0 = off (default). |
 | **Health check** (optional)               | After deploy, poll an HTTP path until it returns the expected status (default **200**). Timeout (default **5** min) → runtime paused, status **error**, last logs kept. Empty path = legacy behavior (active when PM2/Docker is online). |
+| **ClickUp comments**                      | Optional. When a preview first becomes **active**, comment on the ClickUp task whose custom ID matches the branch name. Token + workspace ID in global Settings; enable per project. Instance detail shows task URL + status; you can paste a ClickUp URL to force-link without posting a comment. |
 
 The scheduler runs every minute. The **Instances** list and instance detail page show `activeExpiresAt` and `existenceExpiresAt` when limits apply.
 

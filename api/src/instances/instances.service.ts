@@ -53,13 +53,24 @@ export class InstancesService {
     const remote = parseRemoteId(id);
     if (remote) {
       throw new NotFoundException(
-        'Override de env em instâncias remotas ainda não é suportado; edite no nó de origem',
+        'Edição de instâncias remotas ainda não é suportada; edite no nó de origem',
       );
     }
-    if (dto.envVars === undefined) {
+    if (dto.envVars === undefined && dto.clickupTaskUrl === undefined) {
       return this.getOneForApi(id);
     }
-    const row = await this.previewInstances.updateEnvVars(id, dto.envVars);
+    if (dto.envVars !== undefined) {
+      await this.previewInstances.updateEnvVars(id, dto.envVars);
+    }
+    if (dto.clickupTaskUrl !== undefined) {
+      const row = await this.previewInstances.updateClickupTaskLink(
+        id,
+        dto.clickupTaskUrl,
+      );
+      return this.cluster.tagLocal(row);
+    }
+    const maps = await this.previewInstances.fetchRuntimeMaps();
+    const row = await this.previewInstances.findOneForApi(id, maps);
     return this.cluster.tagLocal(row);
   }
 

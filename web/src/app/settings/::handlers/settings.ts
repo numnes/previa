@@ -16,6 +16,10 @@ export type SettingsPayload = {
   discordWebhookUrl?: string;
   discordNotifyStatuses?: DiscordNotifyStatus[];
   discordMessageTemplate?: string;
+  clickupApiTokenConfigured?: boolean;
+  clickupApiTokenLast4?: string;
+  clickupTeamId?: string;
+  clickupCommentTemplate?: string;
   [key: string]: unknown;
 };
 
@@ -32,6 +36,9 @@ export async function patchSettings(body: {
   discordWebhookUrl?: string;
   discordNotifyStatuses?: DiscordNotifyStatus[];
   discordMessageTemplate?: string;
+  clickupApiToken?: string;
+  clickupTeamId?: string;
+  clickupCommentTemplate?: string;
 }): Promise<SettingsPayload> {
   const token = getTokenClient();
   return await httpJson<SettingsPayload>(`${apiBaseClient()}/settings`, {

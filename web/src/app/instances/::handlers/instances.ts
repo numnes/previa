@@ -37,6 +37,10 @@ export type InstanceRow = {
   hasExistenceLifetimeLimit: boolean;
   envVars?: Record<string, string>;
   projectEnvVars?: Record<string, string>;
+  clickupTaskId?: string | null;
+  clickupTaskUrl?: string | null;
+  clickupTaskStatus?: string | null;
+  clickupManualLink?: boolean;
   createdAt: string;
   updatedAt: string;
 } & NodeRef;

@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { ApiKeysSection } from './ApiKeysSection';
 import { ClusterSettingsSection } from './ClusterSettingsSection';
 import { DiscordNotificationsSection } from './DiscordNotificationsSection';
+import { ClickupNotificationsSection } from './ClickupNotificationsSection';
 import { fetchSettings, patchSettings } from './::handlers/settings';
 
 export default function SettingsPage() {
@@ -126,6 +127,10 @@ export default function SettingsPage() {
 
             <div className="card p-5">
               <DiscordNotificationsSection />
+            </div>
+
+            <div className="card p-5">
+              <ClickupNotificationsSection />
             </div>
 
             <div className="card p-5">

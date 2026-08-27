@@ -45,6 +45,29 @@ export class PatchSettingsDto {
   @IsOptional()
   @IsString()
   discordMessageTemplate?: string;
+
+  @ApiPropertyOptional({
+    description: 'ClickUp personal API token. Empty string clears it. Omit to keep current.',
+  })
+  @IsOptional()
+  @IsString()
+  clickupApiToken?: string | null;
+
+  @ApiPropertyOptional({
+    example: '123456',
+    description: 'ClickUp workspace (team) ID, required to resolve custom task IDs like CICM-123.',
+  })
+  @IsOptional()
+  @IsString()
+  clickupTeamId?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Comment posted on the matching ClickUp task. Placeholders: {{branch_name}}, {{project_name}}, {{preview_link}}, {{task_id}}.',
+  })
+  @IsOptional()
+  @IsString()
+  clickupCommentTemplate?: string;
 }
 
 export { DISCORD_NOTIFY_STATUSES, serializeDiscordNotifyStatuses };

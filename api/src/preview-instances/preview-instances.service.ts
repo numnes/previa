@@ -41,6 +41,7 @@ import {
   DiscordNotificationsService,
   type StatusChangeNotifyPayload,
 } from '../notifications/discord-notifications.service';
+import { ClickupNotificationsService } from '../notifications/clickup-notifications.service';
 import type { PreviewStatus } from './preview-status';
 import {
   computeActiveExpiresAt,
@@ -119,6 +120,12 @@ export type InstanceListItem = {
   projectEnvVars: EnvVarsMap;
   /** Pausa automática por inatividade (idle sleep); nginx aponta para wake. */
   idleSleep: boolean;
+  /** ClickUp task id (manual ou resolvido da branch). */
+  clickupTaskId: string | null;
+  clickupTaskUrl: string | null;
+  clickupTaskStatus: string | null;
+  /** true = vínculo manual; não comenta automaticamente. */
+  clickupManualLink: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -138,6 +145,7 @@ export class PreviewInstancesService {
     private readonly projects: ProjectsService,
     private readonly settings: SettingsService,
     private readonly discordNotifications: DiscordNotificationsService,
+    private readonly clickupNotifications: ClickupNotificationsService,
     private readonly config: ConfigService,
     private readonly dataSource: DataSource,
     @InjectQueue('deploy')
@@ -247,6 +255,9 @@ export class PreviewInstancesService {
       oldStatus,
       newStatus,
     });
+    if (newStatus === 'active') {
+      this.clickupNotifications.notifyPreviewReadySafe(instanceId);
+    }
   }
 
   private async setStatus(row: PreviewInstance, next: PreviewStatus) {
@@ -773,6 +784,10 @@ export class PreviewInstancesService {
       hasExistenceLifetimeLimit,
       envVars: normalizeEnvVars(r.envVars),
       projectEnvVars: normalizeEnvVars(r.project?.envVars),
+      clickupTaskId: r.clickupTaskId ?? null,
+      clickupTaskUrl: r.clickupTaskUrl ?? null,
+      clickupTaskStatus: r.clickupTaskStatus ?? null,
+      clickupManualLink: !!r.clickupManualLink,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
     };
@@ -789,6 +804,7 @@ export class PreviewInstancesService {
   }
 
   async findOneForApi(id: string, maps: RuntimeMaps): Promise<InstanceListItem> {
+    await this.clickupNotifications.refreshInstanceTaskInfo(id);
     const r = await this.repo.findOne({
       where: { id },
       relations: ['project'],
@@ -797,6 +813,15 @@ export class PreviewInstancesService {
       throw new NotFoundException(`Instância "${id}" não encontrada`);
     }
     return this.buildListItem(r, maps);
+  }
+
+  async updateClickupTaskLink(
+    id: string,
+    clickupTaskUrl: string | null,
+  ): Promise<InstanceListItem> {
+    await this.clickupNotifications.linkInstanceTask(id, clickupTaskUrl);
+    const maps = await this.fetchRuntimeMaps();
+    return this.findOneForApi(id, maps);
   }
 
   async findEntityById(id: string): Promise<PreviewInstance | null> {

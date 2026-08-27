@@ -7,8 +7,12 @@ import {
   DEFAULT_DISCORD_MESSAGE_TEMPLATE,
   parseDiscordNotifyStatuses,
 } from '../notifications/discord-message.util';
+import { DEFAULT_CLICKUP_COMMENT_TEMPLATE, maskClickupToken } from '../notifications/clickup-task.util';
 import { PatchSettingsDto, serializeDiscordNotifyStatuses } from './dto/patch-settings.dto';
 import {
+  CLICKUP_API_TOKEN_KEY,
+  CLICKUP_COMMENT_TEMPLATE_KEY,
+  CLICKUP_TEAM_ID_KEY,
   DISCORD_MESSAGE_TEMPLATE_KEY,
   DISCORD_NOTIFY_STATUSES_KEY,
   DISCORD_WEBHOOK_URL_KEY,
@@ -28,6 +32,7 @@ export class SettingsController {
   @Get()
   async getAll() {
     const raw = await this.settings.getAll();
+    const { [CLICKUP_API_TOKEN_KEY]: clickupToken, ...publicRaw } = raw;
     const maxActiveInstances = await this.settings.getMaxActiveInstances();
     const nodeLabel = await this.settings.getNodeLabel();
     const discordWebhookUrl =
@@ -38,15 +43,23 @@ export class SettingsController {
     const discordMessageTemplate =
       (await this.settings.getValue(DISCORD_MESSAGE_TEMPLATE_KEY))?.trim() ||
       DEFAULT_DISCORD_MESSAGE_TEMPLATE;
+    const clickupTeamId =
+      (await this.settings.getValue(CLICKUP_TEAM_ID_KEY))?.trim() || '';
+    const clickupCommentTemplate =
+      (await this.settings.getValue(CLICKUP_COMMENT_TEMPLATE_KEY))?.trim() ||
+      DEFAULT_CLICKUP_COMMENT_TEMPLATE;
 
     return {
-      ...raw,
+      ...publicRaw,
       [MAX_ACTIVE_INSTANCES_KEY]: String(maxActiveInstances),
       maxActiveInstancesParsed: maxActiveInstances,
       nodeLabel,
       discordWebhookUrl,
       discordNotifyStatuses,
       discordMessageTemplate,
+      clickupTeamId,
+      clickupCommentTemplate,
+      ...maskClickupToken(clickupToken),
     };
   }
 
@@ -76,6 +89,19 @@ export class SettingsController {
       await this.settings.setValue(
         DISCORD_MESSAGE_TEMPLATE_KEY,
         body.discordMessageTemplate.trim(),
+      );
+    }
+    if (body.clickupApiToken !== undefined) {
+      const trimmed = body.clickupApiToken?.trim() ?? '';
+      await this.settings.setValue(CLICKUP_API_TOKEN_KEY, trimmed);
+    }
+    if (body.clickupTeamId !== undefined) {
+      await this.settings.setValue(CLICKUP_TEAM_ID_KEY, body.clickupTeamId?.trim() ?? '');
+    }
+    if (body.clickupCommentTemplate !== undefined) {
+      await this.settings.setValue(
+        CLICKUP_COMMENT_TEMPLATE_KEY,
+        body.clickupCommentTemplate.trim(),
       );
     }
     return this.getAll();

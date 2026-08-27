@@ -10,6 +10,9 @@ export const NODE_LABEL_KEY = 'node_label';
 export const DISCORD_WEBHOOK_URL_KEY = 'discord_webhook_url';
 export const DISCORD_NOTIFY_STATUSES_KEY = 'discord_notify_statuses';
 export const DISCORD_MESSAGE_TEMPLATE_KEY = 'discord_message_template';
+export const CLICKUP_API_TOKEN_KEY = 'clickup_api_token';
+export const CLICKUP_TEAM_ID_KEY = 'clickup_team_id';
+export const CLICKUP_COMMENT_TEMPLATE_KEY = 'clickup_comment_template';
 
 @Injectable()
 export class SettingsService implements OnModuleInit {
