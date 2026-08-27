@@ -12,6 +12,10 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { listInstances, runnerLabel, type InstanceRow } from './::handlers/instances';
 import { InstanceLifetimeCell } from './InstanceLifetimeCell';
 import { formatInstanceCpu, instanceCpuTitle } from '@/lib/instance-monit';
+import {
+  clickupStatusBadgeClass,
+  instanceStatusBadgeClass,
+} from '@/lib/status-badge';
 
 const INSTANCE_STATUSES = ['waiting', 'deploying', 'active', 'paused', 'error'] as const;
 
@@ -101,6 +105,16 @@ function InstancesPageContent() {
       return hay.includes(q);
     });
   }, [instances, search, statusFilter]);
+
+  const showClickupCol = useMemo(
+    () =>
+      !!instances?.some(
+        (i) => i.clickupConfigured || !!i.clickupTaskStatus || !!i.clickupTaskId,
+      ),
+    [instances],
+  );
+
+  const colCount = showClickupCol ? 14 : 13;
 
   const hasFilters = search.trim().length > 0 || statusFilter.length > 0;
 
@@ -199,6 +213,11 @@ function InstancesPageContent() {
                 <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
                   Status
                 </th>
+                {showClickupCol ? (
+                  <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
+                    ClickUp
+                  </th>
+                ) : null}
                 <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
                   Lifetime
                 </th>
@@ -258,7 +277,11 @@ function InstancesPageContent() {
                   {i.port ?? '—'}
                 </td>
                 <td className="border-b border-white/10 px-3 py-2 text-white/70">
-                  <span className="rounded-md bg-white/10 px-2 py-0.5 font-mono text-xs">
+                  <span
+                    className={instanceStatusBadgeClass(i.status, {
+                      idleSleep: !!i.idleSleep,
+                    })}
+                  >
                     {i.status}
                     {i.status === 'paused' && i.idleSleep ? ' · idle' : ''}
                   </span>
@@ -271,6 +294,37 @@ function InstancesPageContent() {
                     </p>
                   ) : null}
                 </td>
+                {showClickupCol ? (
+                  <td className="border-b border-white/10 px-3 py-2 text-white/70">
+                    {i.clickupTaskStatus ? (
+                      i.clickupTaskUrl ? (
+                        <Link
+                          className={`${clickupStatusBadgeClass(i.clickupTaskStatus)} hover:underline`}
+                          href={i.clickupTaskUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={
+                            i.clickupTaskId
+                              ? `ClickUp ${i.clickupTaskId}`
+                              : 'Open ClickUp task'
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {i.clickupTaskStatus}
+                        </Link>
+                      ) : (
+                        <span
+                          className={clickupStatusBadgeClass(i.clickupTaskStatus)}
+                          title={i.clickupTaskId ?? undefined}
+                        >
+                          {i.clickupTaskStatus}
+                        </span>
+                      )
+                    ) : (
+                      <span className="text-white/45">—</span>
+                    )}
+                  </td>
+                ) : null}
                 <td className="border-b border-white/10 px-3 py-2 text-white/70">
                   <InstanceLifetimeCell row={i} />
                 </td>
@@ -317,7 +371,7 @@ function InstancesPageContent() {
             ))}
             {instances && filtered && filtered.length === 0 ? (
               <tr>
-                <td colSpan={13} className="px-3 py-3 text-white/70">
+                <td colSpan={colCount} className="px-3 py-3 text-white/70">
                   {hasFilters
                     ? 'No instances match the current filters.'
                     : 'No instances yet (they appear here after a successful deploy).'}
@@ -326,7 +380,7 @@ function InstancesPageContent() {
             ) : null}
             {!instances && !error ? (
               <tr>
-                <td colSpan={13} className="px-3 py-3 text-white/70">
+                <td colSpan={colCount} className="px-3 py-3 text-white/70">
                   Loading…
                 </td>
               </tr>

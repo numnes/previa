@@ -41,6 +41,8 @@ export type InstanceRow = {
   clickupTaskUrl?: string | null;
   clickupTaskStatus?: string | null;
   clickupManualLink?: boolean;
+  /** Token ClickUp configured in Settings (same on every row). */
+  clickupConfigured?: boolean;
   createdAt: string;
   updatedAt: string;
 } & NodeRef;

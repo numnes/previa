@@ -29,6 +29,10 @@ import {
   lifetimeExpiryDisplay,
 } from '@/lib/instance-lifetime';
 import { formatInstanceCpu, instanceCpuTitle } from '@/lib/instance-monit';
+import {
+  clickupStatusBadgeClass,
+  instanceStatusBadgeClass,
+} from '@/lib/status-badge';
 
 type InstanceTab = 'overview' | 'environment' | 'logs';
 type StatusAction = 'pause' | 'activate' | 'awake' | 'remove' | null;
@@ -548,13 +552,17 @@ export default function InstanceDetailClient() {
                     <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                       <div>
                         <dt className="text-white/55">Status (database)</dt>
-                        <dd className="font-mono text-white/90">
-                          {row.status}
-                          {row.status === 'paused' && row.idleSleep ? (
-                            <span className="ml-2 text-xs text-amber-200/80">(idle sleep)</span>
-                          ) : null}
+                        <dd className="mt-1 flex flex-wrap items-center gap-2">
+                          <span
+                            className={`${instanceStatusBadgeClass(row.status, {
+                              idleSleep: !!row.idleSleep,
+                            })} font-mono`}
+                          >
+                            {row.status}
+                            {row.status === 'paused' && row.idleSleep ? ' · idle' : ''}
+                          </span>
                           {statusBusy ? (
-                            <span className="ml-2 text-xs text-sky-300/80">(updating)</span>
+                            <span className="text-xs text-sky-300/80">(updating)</span>
                           ) : null}
                         </dd>
                       </div>
@@ -628,7 +636,7 @@ export default function InstanceDetailClient() {
                                 <span className="font-mono text-white/80">{row.clickupTaskId}</span>
                               ) : null}
                               {row.clickupTaskStatus ? (
-                                <span className="rounded border border-white/15 bg-black/25 px-2 py-0.5 text-xs text-white/75">
+                                <span className={clickupStatusBadgeClass(row.clickupTaskStatus)}>
                                   {row.clickupTaskStatus}
                                 </span>
                               ) : null}

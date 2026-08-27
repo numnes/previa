@@ -36,7 +36,7 @@ import { PreviewInstanceStatusEvent } from '../entities/preview-instance-status-
 import { ProjectsService } from '../projects/projects.service';
 import { fetchPm2ByName, type Pm2Monit } from '../instances/pm2-list.helper';
 import { fetchDockerByName } from '../instances/docker-list.helper';
-import { SettingsService } from '../settings/settings.service';
+import { CLICKUP_API_TOKEN_KEY, SettingsService } from '../settings/settings.service';
 import {
   DiscordNotificationsService,
   type StatusChangeNotifyPayload,
@@ -78,6 +78,8 @@ export type RuntimeInfo = {
 export type RuntimeMaps = {
   pm2: Map<string, { status: string | null; monit?: Pm2Monit }>;
   docker: Map<string, { running: boolean; status: string | null }>;
+  /** Token ClickUp configurado em Settings (global). */
+  clickupConfigured: boolean;
 };
 
 export type InstanceListItem = {
@@ -126,6 +128,8 @@ export type InstanceListItem = {
   clickupTaskStatus: string | null;
   /** true = vínculo manual; não comenta automaticamente. */
   clickupManualLink: boolean;
+  /** Token ClickUp configurado em Settings (mesma flag em todas as linhas). */
+  clickupConfigured: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -708,11 +712,16 @@ export class PreviewInstancesService {
 
   /** Busca o estado de runtime (pm2 + docker) em paralelo. */
   async fetchRuntimeMaps(): Promise<RuntimeMaps> {
-    const [pm2, docker] = await Promise.all([
+    const [pm2, docker, clickupToken] = await Promise.all([
       fetchPm2ByName(this.config),
       fetchDockerByName(this.config),
+      this.settings.getValue(CLICKUP_API_TOKEN_KEY),
     ]);
-    return { pm2, docker };
+    return {
+      pm2,
+      docker,
+      clickupConfigured: !!clickupToken?.trim(),
+    };
   }
 
   /** Resolve o runtime da instância conforme o runner gravado no banco. */
@@ -788,6 +797,7 @@ export class PreviewInstancesService {
       clickupTaskUrl: r.clickupTaskUrl ?? null,
       clickupTaskStatus: r.clickupTaskStatus ?? null,
       clickupManualLink: !!r.clickupManualLink,
+      clickupConfigured: maps.clickupConfigured,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
     };
