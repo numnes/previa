@@ -153,4 +153,9 @@ export class ProjectsService {
     await this.findOne(id);
     return this.previewInstances.restartAllForProject(id);
   }
+
+  async linkClickupAllInstances(id: string) {
+    await this.findOne(id);
+    return this.previewInstances.linkClickupFromBranchForProject(id);
+  }
 }

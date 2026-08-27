@@ -42,6 +42,7 @@ import {
   type StatusChangeNotifyPayload,
 } from '../notifications/discord-notifications.service';
 import { ClickupNotificationsService } from '../notifications/clickup-notifications.service';
+import { extractClickupTaskId } from '../notifications/clickup-task.util';
 import type { PreviewStatus } from './preview-status';
 import {
   computeActiveExpiresAt,
@@ -838,6 +839,49 @@ export class PreviewInstancesService {
     await this.clickupNotifications.linkInstanceTaskFromBranch(id);
     const maps = await this.fetchRuntimeMaps();
     return this.findOneForApi(id, maps);
+  }
+
+  /**
+   * Resolve ClickUp tasks from branch names for every instance in the project.
+   * Skips manual links and branches without a recognizable task id. Does not post comments.
+   */
+  async linkClickupFromBranchForProject(projectId: string): Promise<{
+    linked: number;
+    skipped: number;
+    failed: number;
+  }> {
+    const token = (await this.settings.getValue(CLICKUP_API_TOKEN_KEY))?.trim();
+    if (!token) {
+      throw new BadRequestException(
+        'Configure o token ClickUp em Settings antes de vincular as tarefas.',
+      );
+    }
+
+    const rows = await this.findAllByProjectId(projectId);
+    let linked = 0;
+    let skipped = 0;
+    let failed = 0;
+
+    for (const row of rows) {
+      if (row.clickupManualLink) {
+        skipped++;
+        continue;
+      }
+      if (!extractClickupTaskId(row.branch)) {
+        skipped++;
+        continue;
+      }
+      try {
+        await this.clickupNotifications.linkInstanceTaskFromBranch(row.id);
+        linked++;
+      } catch (e) {
+        failed++;
+        const msg = e instanceof Error ? e.message : String(e);
+        this.log.warn(`ClickUp link from branch ${row.branch} (${row.id}): ${msg}`);
+      }
+    }
+
+    return { linked, skipped, failed };
   }
 
   async findEntityById(id: string): Promise<PreviewInstance | null> {

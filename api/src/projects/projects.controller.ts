@@ -102,6 +102,18 @@ export class ProjectsController {
   }
 
   @ApiBearerAuth('jwt')
+  @ApiOkResponse({
+    description:
+      'Resolve tarefas ClickUp a partir do nome da branch em todas as instâncias do projeto (sem comentar)',
+  })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post(':id/instances/link-clickup')
+  linkClickupInstances(@Param('id', ParseUUIDPipe) id: string) {
+    return this.projects.linkClickupAllInstances(id);
+  }
+
+  @ApiBearerAuth('jwt')
   @ApiOkResponse({ description: 'Remove projeto e todas as instâncias' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')

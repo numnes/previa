@@ -16,6 +16,7 @@ import { listInstances } from '../../../instances/::handlers/instances';
 import {
   deleteProject,
   getProject,
+  linkClickupProjectInstances,
   patchProject,
   restartProjectInstances,
   sleepProjectInstances,
@@ -526,6 +527,48 @@ export default function ProjectSettingsClient() {
                                 clickupCommentsEnabled ? 'translate-x-5' : 'translate-x-0'
                               }`}
                             />
+                          </button>
+                        </div>
+                        <div className="mt-4">
+                          <p className="text-xs text-[#8b919a]">
+                            Match ClickUp tasks from each instance branch name (no comments). Skips
+                            manual links and branches without a task id.
+                          </p>
+                          <button
+                            type="button"
+                            className="btn mt-3 text-sm"
+                            disabled={bulkLoading !== null || instanceCount === 0}
+                            onClick={async () => {
+                              if (
+                                !confirm(
+                                  `Match ClickUp tasks from branch for all instances of "${project.slug}"?\n\nDoes not post comments. Manual links are left unchanged.`,
+                                )
+                              ) {
+                                return;
+                              }
+                              setError(null);
+                              setActionMsg(null);
+                              setBulkLoading('link-clickup');
+                              try {
+                                const r = await linkClickupProjectInstances(id);
+                                setActionMsg(
+                                  `ClickUp link done: ${r.linked ?? 0} linked, ${r.skipped ?? 0} skipped, ${r.failed ?? 0} failed.`,
+                                );
+                                router.refresh();
+                              } catch (e) {
+                                setError(
+                                  e instanceof Error
+                                    ? e.message
+                                    : 'Could not link ClickUp tasks from branches.',
+                                );
+                              } finally {
+                                setBulkLoading(null);
+                              }
+                            }}
+                          >
+                            {bulkLoading === 'link-clickup'
+                              ? 'Matching…'
+                              : 'Match ClickUp from branches'}
                           </button>
                         </div>
                       </div>

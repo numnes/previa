@@ -96,6 +96,7 @@ export type ProjectBulkResult = {
   restarted?: number;
   slept?: number;
   awoken?: number;
+  linked?: number;
   instances?: { destroyed: number; failed: number };
 };
 
@@ -144,6 +145,19 @@ export async function awakeProjectInstances(id: string): Promise<ProjectBulkResu
   const token = getTokenClient();
   return await httpJson<ProjectBulkResult>(
     `${apiBaseClient()}/projects/${id}/instances/awake`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
+}
+
+export async function linkClickupProjectInstances(
+  id: string,
+): Promise<ProjectBulkResult> {
+  const token = getTokenClient();
+  return await httpJson<ProjectBulkResult>(
+    `${apiBaseClient()}/projects/${id}/instances/link-clickup`,
     {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
