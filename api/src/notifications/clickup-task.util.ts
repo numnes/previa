@@ -1,10 +1,23 @@
+/** ClickUp custom task id like CICM-4491 (prefix-number). */
+export function isClickupCustomTaskId(taskId: string): boolean {
+  return /^[A-Za-z][A-Za-z0-9]*-\d+$/.test(taskId.trim());
+}
+
+/** Normalize custom ids to PREFIX-number (ClickUp stores them uppercase). */
+export function normalizeClickupTaskId(taskId: string): string {
+  const trimmed = taskId.trim();
+  if (!isClickupCustomTaskId(trimmed)) return trimmed;
+  const dash = trimmed.lastIndexOf('-');
+  return `${trimmed.slice(0, dash).toUpperCase()}-${trimmed.slice(dash + 1)}`;
+}
+
 export function extractClickupTaskId(branch: string): string | null {
   const trimmed = branch.trim();
   if (!trimmed) return null;
 
   const customIds = trimmed.match(/[A-Za-z][A-Za-z0-9]*-\d+/g);
   if (customIds?.length) {
-    return customIds[customIds.length - 1];
+    return normalizeClickupTaskId(customIds[customIds.length - 1]);
   }
 
   const leaf = trimmed.split('/').pop() ?? trimmed;
@@ -32,14 +45,14 @@ export function parseClickupTaskRef(input: string): string | null {
     const path = url.pathname;
     const tMatch = path.match(/\/t\/([^/?#]+)/i);
     if (tMatch?.[1]) {
-      return decodeURIComponent(tMatch[1]);
+      return normalizeClickupTaskId(decodeURIComponent(tMatch[1]));
     }
   } catch {
     // not a URL — treat as id
   }
 
   if (/^[A-Za-z][A-Za-z0-9]*-\d+$/.test(trimmed)) {
-    return trimmed;
+    return normalizeClickupTaskId(trimmed);
   }
   if (/^[a-z0-9]{6,12}$/i.test(trimmed)) {
     return trimmed;

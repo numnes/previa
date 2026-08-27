@@ -7,9 +7,9 @@ import {
 
 describe('clickup-task.util', () => {
   it('extracts custom task ids from branch names', () => {
-    expect(extractClickupTaskId('cicm-4491')).toBe('cicm-4491');
+    expect(extractClickupTaskId('cicm-4491')).toBe('CICM-4491');
     expect(extractClickupTaskId('feature/CICM-123')).toBe('CICM-123');
-    expect(extractClickupTaskId('fix/abc-99-extra')).toBe('abc-99');
+    expect(extractClickupTaskId('fix/abc-99-extra')).toBe('ABC-99');
   });
 
   it('returns null when no task id is present', () => {
@@ -22,10 +22,12 @@ describe('clickup-task.util', () => {
     expect(parseClickupTaskRef('https://app.clickup.com/t/CICM-4491?comment=1')).toBe(
       'CICM-4491',
     );
+    expect(parseClickupTaskRef('https://app.clickup.com/t/cicm-4491')).toBe('CICM-4491');
     expect(
       parseClickupTaskRef('https://app.clickup.com/123/v/li/456/t/86xyz789'),
     ).toBe('86xyz789');
     expect(parseClickupTaskRef('CICM-4491')).toBe('CICM-4491');
+    expect(parseClickupTaskRef('cicm-4491')).toBe('CICM-4491');
     expect(parseClickupTaskRef('not a task')).toBeNull();
   });
 

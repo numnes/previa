@@ -121,8 +121,9 @@ export function ClickupNotificationsSection() {
           />
         </label>
         <p className="text-xs text-white/55">
-          Required to resolve custom IDs (CICM-123). In ClickUp, open Settings → ClickUp API, or
-          copy the numeric ID from the workspace URL.
+          Required for custom IDs (CICM-123) when matching from a branch. Use the numeric Workspace
+          ID (Settings → ClickUp API, or the ID in the workspace URL). If wrong, Previa tries
+          workspaces authorized for your token automatically.
         </p>
 
         <label className="block text-sm text-white/70">
