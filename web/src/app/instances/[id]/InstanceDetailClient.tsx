@@ -58,7 +58,10 @@ export default function InstanceDetailClient() {
   const [envSaving, setEnvSaving] = useState(false);
   const [envSaved, setEnvSaved] = useState(false);
   const [clickupInput, setClickupInput] = useState('');
-  const [clickupSaving, setClickupSaving] = useState(false);
+  const [clickupBusy, setClickupBusy] = useState<
+    null | 'match' | 'save' | 'clear'
+  >(null);
+  const clickupSaving = clickupBusy != null;
   const actionLock = useRef(false);
 
   const statusBusy = statusAction !== null;
@@ -644,17 +647,62 @@ export default function InstanceDetailClient() {
                             <div className="mt-2 max-w-xl space-y-2">
                               <label className="block text-xs text-white/55">
                                 Force link (paste ClickUp URL or task ID)
+                              </label>
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                                 <input
-                                  className="input mt-1 font-mono text-sm"
+                                  className="input min-w-0 flex-1 font-mono text-sm"
                                   value={clickupInput}
                                   onChange={(e) => setClickupInput(e.target.value)}
                                   placeholder="https://app.clickup.com/t/CICM-4491"
                                   disabled={clickupSaving || statusBusy}
                                 />
-                              </label>
+                                <button
+                                  type="button"
+                                  className="btn shrink-0 text-sm"
+                                  disabled={clickupSaving || statusBusy}
+                                  title={`Match ClickUp task from branch "${row.branch}"`}
+                                  onClick={async () => {
+                                    setClickupBusy('match');
+                                    setError(null);
+                                    try {
+                                      const updated = await patchInstance(id, {
+                                        clickupLinkFromBranch: true,
+                                      });
+                                      setRow(updated);
+                                      setClickupInput('');
+                                      toast.push({
+                                        title: updated.clickupTaskUrl
+                                          ? 'ClickUp task matched from branch'
+                                          : 'No ClickUp task found for branch',
+                                        description: updated.clickupTaskId
+                                          ? `Task ${updated.clickupTaskId}`
+                                          : undefined,
+                                        variant: updated.clickupTaskUrl
+                                          ? 'success'
+                                          : 'info',
+                                      });
+                                    } catch (e) {
+                                      setError(
+                                        e instanceof Error
+                                          ? e.message
+                                          : 'Could not match ClickUp task from branch. Check the branch name and API token in Settings.',
+                                      );
+                                    } finally {
+                                      setClickupBusy(null);
+                                    }
+                                  }}
+                                >
+                                  {clickupBusy === 'match'
+                                    ? 'Working…'
+                                    : 'Match from branch'}
+                                </button>
+                              </div>
                               <p className="text-xs text-white/45">
                                 Manual links only show the task URL and status — Previa will not
-                                post a preview comment on that task.
+                                post a preview comment on that task. Use{' '}
+                                <span className="text-white/70">Match from branch</span> to resolve
+                                from the branch name (e.g.{' '}
+                                <span className="font-mono">{row.branch}</span>).
                               </p>
                               <div className="flex flex-wrap gap-2">
                                 <button
@@ -662,7 +710,7 @@ export default function InstanceDetailClient() {
                                   className="btn btn-primary text-sm"
                                   disabled={clickupSaving || statusBusy}
                                   onClick={async () => {
-                                    setClickupSaving(true);
+                                    setClickupBusy('save');
                                     setError(null);
                                     try {
                                       const updated = await patchInstance(id, {
@@ -685,19 +733,21 @@ export default function InstanceDetailClient() {
                                         'Could not link ClickUp task. Check the URL and API token in Settings.',
                                       );
                                     } finally {
-                                      setClickupSaving(false);
+                                      setClickupBusy(null);
                                     }
                                   }}
                                 >
-                                  {clickupSaving ? 'Saving…' : 'Save ClickUp link'}
+                                  {clickupBusy === 'save'
+                                    ? 'Saving…'
+                                    : 'Save ClickUp link'}
                                 </button>
-                                {row.clickupManualLink ? (
+                                {row.clickupManualLink || row.clickupTaskId ? (
                                   <button
                                     type="button"
                                     className="btn text-sm"
                                     disabled={clickupSaving || statusBusy}
                                     onClick={async () => {
-                                      setClickupSaving(true);
+                                      setClickupBusy('clear');
                                       setError(null);
                                       try {
                                         const updated = await patchInstance(id, {
@@ -712,11 +762,11 @@ export default function InstanceDetailClient() {
                                       } catch {
                                         setError('Could not clear ClickUp link.');
                                       } finally {
-                                        setClickupSaving(false);
+                                        setClickupBusy(null);
                                       }
                                     }}
                                   >
-                                    Clear
+                                    {clickupBusy === 'clear' ? 'Clearing…' : 'Clear'}
                                   </button>
                                 ) : null}
                               </div>

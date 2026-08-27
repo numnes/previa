@@ -56,11 +56,19 @@ export class InstancesService {
         'Edição de instâncias remotas ainda não é suportada; edite no nó de origem',
       );
     }
-    if (dto.envVars === undefined && dto.clickupTaskUrl === undefined) {
+    if (
+      dto.envVars === undefined &&
+      dto.clickupTaskUrl === undefined &&
+      dto.clickupLinkFromBranch === undefined
+    ) {
       return this.getOneForApi(id);
     }
     if (dto.envVars !== undefined) {
       await this.previewInstances.updateEnvVars(id, dto.envVars);
+    }
+    if (dto.clickupLinkFromBranch === true) {
+      const row = await this.previewInstances.linkClickupTaskFromBranch(id);
+      return this.cluster.tagLocal(row);
     }
     if (dto.clickupTaskUrl !== undefined) {
       const row = await this.previewInstances.updateClickupTaskLink(

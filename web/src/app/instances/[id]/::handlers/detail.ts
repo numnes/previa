@@ -64,6 +64,7 @@ export async function patchInstance(
   body: {
     envVars?: Record<string, string>;
     clickupTaskUrl?: string | null;
+    clickupLinkFromBranch?: boolean;
   },
 ): Promise<InstanceRow> {
   const token = getTokenClient();

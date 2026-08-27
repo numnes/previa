@@ -142,6 +142,42 @@ export class ClickupNotificationsService {
     return this.instances.save(row);
   }
 
+  /**
+   * Resolve task from the branch name (custom id). Stores link + status as auto match
+   * (not manual), without posting a comment.
+   */
+  async linkInstanceTaskFromBranch(instanceId: string): Promise<PreviewInstance> {
+    const row = await this.instances.findOne({
+      where: { id: instanceId },
+      relations: ['project'],
+    });
+    if (!row) {
+      throw new BadRequestException('Instância não encontrada');
+    }
+
+    const taskRef = extractClickupTaskId(row.branch);
+    if (!taskRef) {
+      throw new BadRequestException(
+        `Branch "${row.branch}" não contém um ID de tarefa ClickUp (ex.: cicm-4491 ou feature/CICM-123).`,
+      );
+    }
+
+    const token = (await this.settings.getValue(CLICKUP_API_TOKEN_KEY))?.trim();
+    if (!token) {
+      throw new BadRequestException(
+        'Configure o token ClickUp em Settings antes de vincular a tarefa.',
+      );
+    }
+    const teamId = (await this.settings.getValue(CLICKUP_TEAM_ID_KEY))?.trim();
+    const snapshot = await this.fetchTask(token, taskRef, teamId);
+
+    row.clickupTaskId = snapshot.customId || snapshot.id;
+    row.clickupTaskUrl = snapshot.url;
+    row.clickupTaskStatus = snapshot.status;
+    row.clickupManualLink = false;
+    return this.instances.save(row);
+  }
+
   /** Refresh cached status/url for display (detail view). No comment. */
   async refreshInstanceTaskInfo(instanceId: string): Promise<PreviewInstance | null> {
     const row = await this.instances.findOne({

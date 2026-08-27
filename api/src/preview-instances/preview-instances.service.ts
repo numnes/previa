@@ -824,6 +824,12 @@ export class PreviewInstancesService {
     return this.findOneForApi(id, maps);
   }
 
+  async linkClickupTaskFromBranch(id: string): Promise<InstanceListItem> {
+    await this.clickupNotifications.linkInstanceTaskFromBranch(id);
+    const maps = await this.fetchRuntimeMaps();
+    return this.findOneForApi(id, maps);
+  }
+
   async findEntityById(id: string): Promise<PreviewInstance | null> {
     return this.repo.findOne({ where: { id } });
   }
