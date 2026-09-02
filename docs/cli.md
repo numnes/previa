@@ -51,6 +51,11 @@ previa update
 | `PREVIA_INSTALL_DIR`        | Clone destination for `install.sh` (default `~/previa`)                |
 | `PREVIA_REPO_URL`           | Git URL for `install.sh`                                                 |
 | `PREVIA_BIN_DIR`            | Where to link the `previa` executable (default `~/.local/bin`)         |
+
+`install.sh` only clones the repo and installs the CLI. Configure `api/.env` (and optional `previa.env`), then run `previa up` to build and start the stack. `previa up` requires **Docker**, **Compose**, and **Node.js**.
+
+| Variable                      | Purpose                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------ |
 | `PREVIA_ROOT`               | Override install directory for the CLI                                   |
 | `PREVIA_YES`                | Skip confirmation on `down` / `restart`                                  |
 | `PREVIA_PROJECT_SLUG`       | Non-interactive slug for `project init`                                  |

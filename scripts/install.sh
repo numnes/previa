@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Installs previa to ~/previa and registers the "previa" CLI in ~/.local/bin
+# Installs previa to ~/previa and registers the "previa" CLI in ~/.local/bin.
+# Does not build or start services — run `previa up` after configuring api/.env.
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/numnes/previa/main/scripts/install.sh | bash
@@ -31,9 +32,6 @@ need_cmd() {
 
 log "Checking dependencies..."
 need_cmd git
-need_cmd docker
-need_cmd node
-docker compose version >/dev/null 2>&1 || docker-compose version >/dev/null 2>&1 || die "docker compose is not available"
 
 mkdir -p "$BIN_DIR" "$CONFIG_DIR"
 
@@ -50,7 +48,7 @@ PREVIA_BIN_DIR="$BIN_DIR" bash "${INSTALL_DIR}/scripts/sync-cli.sh"
 if [[ ! -f "${INSTALL_DIR}/api/.env" ]]; then
   if [[ -f "${INSTALL_DIR}/api/.env.example" ]]; then
     cp "${INSTALL_DIR}/api/.env.example" "${INSTALL_DIR}/api/.env"
-    log "Created api/.env from .env.example (previa setup will finalize it)"
+    log "Created api/.env from .env.example — edit before starting the stack"
   fi
 fi
 
@@ -73,14 +71,23 @@ case ":${PATH}:" in
     ;;
 esac
 
-echo "Next steps:"
+echo "Configure before the first start (optional but recommended):"
 echo ""
-echo "  previa setup          # start the stack"
+echo "  ${INSTALL_DIR}/api/.env       # API secrets, DB/Redis, work root"
+echo "  ${INSTALL_DIR}/previa.env     # public URLs / fixed ports (copy from previa.env.example)"
+echo ""
+echo "Then build and start the stack:"
+echo ""
+echo "  previa up             # build web + API, start Postgres/Redis/web (Docker) and API (PM2)"
 echo "  previa status         # check services"
+echo ""
+echo "Other commands:"
+echo ""
 echo "  previa project init   # wire an app repo (after stack is up)"
 echo "  previa setup nginx    # print nginx config with locations include"
 echo "  previa help           # list commands"
 echo ""
+echo "Requires Docker, Compose, and Node.js — checked when you run previa up."
 echo "Before the first app deploy, configure Git access on this machine"
-echo "(SSH deploy key or HTTPS token) — shown at the end of previa setup."
+echo "(SSH deploy key or HTTPS token) — shown at the end of previa up."
 echo ""

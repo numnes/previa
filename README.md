@@ -23,36 +23,36 @@ Self-host on a single machine — or aggregate several previa hosts from one das
 
 ### Prerequisites
 
-Install these on the machine that will run previa (the `install.sh` script checks **git**, **Node.js**, and **Docker**):
+Install these on the machine that will run previa:
 
 | Dependency                          | Used for                                                                                | Install                                                                                                                 |
 | ----------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | **Git**                             | Clone previa and app repos                                                            | [git-scm.com/downloads](https://git-scm.com/downloads)                                                                  |
-| **Node.js** (LTS recommended, v18+) | API build, CLI helpers                                                                  | [nodejs.org/en/download](https://nodejs.org/en/download) · [nvm](https://github.com/nvm-sh/nvm)                         |
-| **Docker** + **Compose**            | Postgres, Redis, and web UI containers                                                  | [docs.docker.com/get-docker](https://docs.docker.com/get-docker/)                                                       |
+| **Node.js** (LTS recommended, v18+) | API build, CLI helpers (`previa up`)                                                    | [nodejs.org/en/download](https://nodejs.org/en/download) · [nvm](https://github.com/nvm-sh/nvm)                         |
+| **Docker** + **Compose**            | Postgres, Redis, and web UI containers (`previa up`)                                    | [docs.docker.com/get-docker](https://docs.docker.com/get-docker/)                                                       |
 | **PM2**                             | Runs the previa API locally; also runs preview instances on the host (default runner) | [pm2.keymetrics.io — Quick start](https://pm2.keymetrics.io/docs/usage/quick-start/) (`npm install -g pm2`)             |
 | **nginx**                           | Reverse proxy for preview URLs (`/{project-slug}/{branch-slug}/`)                       | [nginx.org/en/download](https://nginx.org/en/download.html) · [Ubuntu/Debian](https://nginx.org/en/linux_packages.html) |
 
-If PM2 is not installed globally, `previa setup` falls back to `npx pm2` for the API only. For production preview deploys with the **PM2 runner**, install PM2 on the host.
+If PM2 is not installed globally, `previa up` falls back to `npx pm2` for the API only. For production preview deploys with the **PM2 runner**, install PM2 on the host.
 
 nginx is required to serve preview URLs to browsers, but not to start the previa stack itself. See [Configure nginx](docs/nginx.md).
 
 ### Install and start
 
-Install the CLI (clones to `~/previa`, adds `previa` to `~/.local/bin`):
+Install the CLI (clones to `~/previa`, adds `previa` to `~/.local/bin` — **does not build or start services**):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/numnes/previa/main/scripts/install.sh | bash
 ```
 
-Make sure `~/.local/bin` is on your `PATH`, then:
+Make sure `~/.local/bin` is on your `PATH`, then configure env files if needed (`api/.env`, optional `previa.env` from `previa.env.example`), and start:
 
 ```bash
-previa setup    # Postgres + Redis + web (Docker) + API (PM2)
-previa status   # check services
+previa up        # build web + API; start Postgres, Redis, web (Docker) and API (PM2)
+previa status    # check services
 ```
 
-- **Dashboard:** http://localhost:3001 (or the port shown after `previa setup`)
+- **Dashboard:** http://localhost:3001 (or the port shown after `previa up`)
 - **API / Swagger:** http://localhost:3000/docs (API port may differ if 3000 is busy)
 
 On first setup you'll be prompted for an admin email and password.

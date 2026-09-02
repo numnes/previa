@@ -93,6 +93,21 @@ wait_for_http() {
   return 1
 }
 
+need_cmd() {
+  command -v "$1" >/dev/null 2>&1 || {
+    echo "[dev-up] ERROR: Required command not found: $1" >&2
+    exit 1
+  }
+}
+
+echo "[dev-up] Checking dependencies..."
+need_cmd docker
+need_cmd node
+docker compose version >/dev/null 2>&1 || docker-compose version >/dev/null 2>&1 || {
+  echo "[dev-up] ERROR: docker compose is not available" >&2
+  exit 1
+}
+
 stop_api_for_port_scan() {
   if command -v pm2 >/dev/null 2>&1; then
     pm2 delete previa-api >/dev/null 2>&1 || true
