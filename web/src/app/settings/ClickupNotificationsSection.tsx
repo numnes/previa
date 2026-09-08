@@ -53,8 +53,8 @@ export function ClickupNotificationsSection() {
       <h2 className="text-sm font-medium text-[#e8eaed]">ClickUp comments</h2>
       <p className="mt-1 text-xs text-[#8b919a]">
         When a preview first becomes active, post a comment on the ClickUp task whose custom ID
-        matches the branch name (e.g. branch <span className="font-mono">cicm-4491</span> → task
-        CICM-4491). Enable per project in project settings. Requires a public URL on the project.
+        matches the branch name (e.g. branch <span className="font-mono">proj-4491</span> → task
+        PROJ-4491). Enable per project in project settings. Requires a public URL on the project.
       </p>
 
       {error ? <div className="alert-error mt-3">{error}</div> : null}
@@ -121,7 +121,7 @@ export function ClickupNotificationsSection() {
           />
         </label>
         <p className="text-xs text-white/55">
-          Required for custom IDs (CICM-123) when matching from a branch. Use the numeric Workspace
+          Required for custom IDs (PROJ-123) when matching from a branch. Use the numeric Workspace
           ID (Settings → ClickUp API, or the ID in the workspace URL). If wrong, Previa tries
           workspaces authorized for your token automatically.
         </p>

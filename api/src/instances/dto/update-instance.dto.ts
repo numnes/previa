@@ -12,7 +12,7 @@ export class UpdateInstanceDto {
   envVars?: Record<string, string>;
 
   @ApiPropertyOptional({
-    example: 'https://app.clickup.com/t/CICM-4491',
+    example: 'https://app.clickup.com/t/PROJ-4491',
     description:
       'URL ou ID da tarefa ClickUp. null/string vazia remove o vínculo. Não posta comentário — só exibe link e status.',
   })

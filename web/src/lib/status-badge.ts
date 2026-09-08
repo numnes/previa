@@ -62,3 +62,17 @@ export function clickupStatusBadgeClass(status: string): string {
 
   return `${BASE} border-white/15 bg-white/10 text-white/75`;
 }
+
+export function amplifyStageBadgeClass(stage: string | null | undefined): string {
+  const s = (stage ?? '').trim().toLowerCase();
+  if (s === 'production') {
+    return `${BASE} border-emerald-400/35 bg-emerald-500/15 text-emerald-100/90`;
+  }
+  if (s === 'beta' || s === 'development') {
+    return `${BASE} border-sky-400/35 bg-sky-500/15 text-sky-100/90`;
+  }
+  if (s === 'pull_request' || s === 'experimental') {
+    return `${BASE} border-amber-400/35 bg-amber-500/15 text-amber-100/90`;
+  }
+  return `${BASE} border-white/15 bg-white/10 text-white/75`;
+}

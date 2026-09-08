@@ -1,12 +1,15 @@
 import type { AuthUser } from '@/lib/client-auth';
+import type { AmplifyBranchRow } from '@/app/amplify/::handlers/amplify';
 import {
   buildDashboardSummary,
+  createDemoAmplifyBranches,
   createDemoApiKeys,
   createDemoClusterKeys,
   createDemoClusterNodes,
   createDemoInstances,
   createDemoProjects,
   createDemoUsers,
+  DEMO_AMPLIFY_APP_ID,
   type DemoInstance,
   type DemoProject,
 } from './fixtures';
@@ -28,7 +31,15 @@ export type DemoStore = {
   settings: {
     maxActiveInstances: number;
     nodeLabel: string;
+    amplifyAppId: string;
+    amplifyRegion: string;
+    amplifyAccessKeyConfigured: boolean;
+    amplifyAccessKeyLast4: string;
+    amplifySecretConfigured: boolean;
+    amplifyHiddenBranches: string[];
+    amplifyMaxBranches: number;
   };
+  amplifyBranches: AmplifyBranchRow[];
   sessionUser: AuthUser | null;
   logs: Record<string, string>;
 };
@@ -46,7 +57,15 @@ function freshStore(): DemoStore {
     settings: {
       maxActiveInstances: 8,
       nodeLabel: 'hub-demo',
+      amplifyAppId: DEMO_AMPLIFY_APP_ID,
+      amplifyRegion: 'us-east-1',
+      amplifyAccessKeyConfigured: true,
+      amplifyAccessKeyLast4: 'DEMO',
+      amplifySecretConfigured: true,
+      amplifyHiddenBranches: ['main', 'develop'],
+      amplifyMaxBranches: 50,
     },
+    amplifyBranches: createDemoAmplifyBranches(),
     sessionUser: null,
     logs: Object.fromEntries(
       instances.map((i) => [

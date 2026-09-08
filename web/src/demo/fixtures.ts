@@ -9,6 +9,7 @@ import type {
   ClusterNodeRow,
 } from '@/app/settings/::handlers/cluster';
 import type { NodeRef } from '@/lib/node-ref';
+import type { AmplifyBranchRow } from '@/app/amplify/::handlers/amplify';
 
 export const DEMO_CREDENTIALS = {
   admin: { email: 'admin@demo.local', password: 'demo' },
@@ -520,3 +521,83 @@ export const DEMO_INSTANCE_STATIC_PARAMS = [
   { id: 'r:node-edge-1:inst-billing-fix' },
   { id: 'r:node-edge-2:inst-analytics-wait' },
 ];
+
+export const DEMO_AMPLIFY_APP_ID = 'd0exampleappid';
+export const DEMO_AMPLIFY_DOMAIN = `${DEMO_AMPLIFY_APP_ID}.amplifyapp.com`;
+
+export function createDemoAmplifyBranches(): AmplifyBranchRow[] {
+  return [
+    {
+      branchName: 'main',
+      displayName: 'main',
+      stage: 'PRODUCTION',
+      enableAutoBuild: true,
+      lastUpdatedAt: hoursAgo(2),
+      previewUrl: `https://main.${DEMO_AMPLIFY_DOMAIN}`,
+      clickupTaskId: null,
+      clickupTaskUrl: null,
+      clickupTaskStatus: null,
+      clickupTaskName: null,
+    },
+    {
+      branchName: 'develop',
+      displayName: 'develop',
+      stage: 'BETA',
+      enableAutoBuild: true,
+      lastUpdatedAt: hoursAgo(8),
+      previewUrl: `https://develop.${DEMO_AMPLIFY_DOMAIN}`,
+      clickupTaskId: null,
+      clickupTaskUrl: null,
+      clickupTaskStatus: null,
+      clickupTaskName: null,
+    },
+    {
+      branchName: 'proj-1024',
+      displayName: 'proj-1024',
+      stage: 'DEVELOPMENT',
+      enableAutoBuild: true,
+      lastUpdatedAt: hoursAgo(4),
+      previewUrl: `https://proj-1024.${DEMO_AMPLIFY_DOMAIN}`,
+      clickupTaskId: 'PROJ-1024',
+      clickupTaskUrl: 'https://app.clickup.com/t/PROJ-1024',
+      clickupTaskStatus: 'in progress',
+      clickupTaskName: 'Amplify preview example',
+    },
+    {
+      branchName: 'proj-4491',
+      displayName: 'proj-4491',
+      stage: 'DEVELOPMENT',
+      enableAutoBuild: true,
+      lastUpdatedAt: hoursAgo(1),
+      previewUrl: `https://proj-4491.${DEMO_AMPLIFY_DOMAIN}`,
+      clickupTaskId: 'PROJ-4491',
+      clickupTaskUrl: 'https://app.clickup.com/t/PROJ-4491',
+      clickupTaskStatus: 'code review',
+      clickupTaskName: 'Checkout v2 review',
+    },
+    {
+      branchName: 'feature/checkout-v2',
+      displayName: 'feature/checkout-v2',
+      stage: 'EXPERIMENTAL',
+      enableAutoBuild: false,
+      lastUpdatedAt: hoursAgo(20),
+      previewUrl: `https://feature-checkout-v2.${DEMO_AMPLIFY_DOMAIN}`,
+      clickupTaskId: null,
+      clickupTaskUrl: null,
+      clickupTaskStatus: null,
+      clickupTaskName: null,
+    },
+    {
+      branchName: 'pr-88',
+      displayName: 'pr-88',
+      stage: 'PULL_REQUEST',
+      enableAutoBuild: true,
+      lastUpdatedAt: hoursAgo(6),
+      previewUrl: `https://pr-88.${DEMO_AMPLIFY_DOMAIN}`,
+      clickupTaskId: 'PROJ-88',
+      clickupTaskUrl: 'https://app.clickup.com/t/PROJ-88',
+      clickupTaskStatus: 'done',
+      clickupTaskName: 'Hotfix copy',
+    },
+  ];
+}

@@ -105,28 +105,72 @@ export default function ProjectSettingsClient() {
     void load();
   }, [load]);
 
+  const saveEnvironment = useCallback(async () => {
+    setError(null);
+    setEnvSaved(false);
+    setEnvSaving(true);
+    try {
+      const updated = await patchProject(id, { envVars });
+      setProject(updated);
+      setEnvVars(normalizeEnvVars(updated.envVars));
+      setEnvSaved(true);
+      router.refresh();
+    } catch {
+      setError('Could not save environment variables.');
+    } finally {
+      setEnvSaving(false);
+    }
+  }, [id, envVars, router]);
+
   return (
     <RequireAuth>
       <RequireRole roles={['admin']}>
         <PageContainer>
-          <div className="mb-3 text-sm text-[#b8bcc4]">
-            <Link className="link-muted" href="/projects">
-              ← Back to projects
-            </Link>
+          <div className="sticky top-0 z-20 -mx-4 -mt-5 mb-3 border-b border-[#3d4048]/80 bg-[#2b2e33]/95 px-4 pb-1 pt-5 backdrop-blur sm:-mx-5 sm:px-5">
+            <div className="mb-3 text-sm text-[#b8bcc4]">
+              <Link className="link-muted" href="/projects">
+                ← Back to projects
+              </Link>
+            </div>
+            <PageHeader
+              title="Project settings"
+              subtitle={
+                project ? (
+                  <>
+                    Slug: <span className="font-semibold text-[#e8eaed]">{project.slug}</span>
+                    {' · '}
+                    {instanceCount} instance{instanceCount === 1 ? '' : 's'}
+                  </>
+                ) : undefined
+              }
+              action={
+                <div className="flex items-center gap-2">
+                  <ReloadButton onReload={load} title="Reload project" />
+                  {project && !error ? (
+                    tab === 'general' ? (
+                      <button
+                        className="btn btn-success"
+                        type="submit"
+                        form="project-general-settings"
+                        disabled={saving || loading}
+                      >
+                        {saving ? 'Saving…' : 'Save'}
+                      </button>
+                    ) : (
+                      <button
+                        className="btn btn-success"
+                        type="button"
+                        disabled={envSaving || loading}
+                        onClick={() => void saveEnvironment()}
+                      >
+                        {envSaving ? 'Saving…' : 'Save environment'}
+                      </button>
+                    )
+                  ) : null}
+                </div>
+              }
+            />
           </div>
-          <PageHeader
-            title="Project settings"
-            subtitle={
-              project ? (
-                <>
-                  Slug: <span className="font-semibold text-[#e8eaed]">{project.slug}</span>
-                  {' · '}
-                  {instanceCount} instance{instanceCount === 1 ? '' : 's'}
-                </>
-              ) : undefined
-            }
-            action={<ReloadButton onReload={load} title="Reload project" />}
-          />
 
           {loading ? <div className="text-sm text-white/70">Loading…</div> : null}
           {error ? <div className="alert-error mb-4">{error}</div> : null}
@@ -509,7 +553,7 @@ export default function ProjectSettingsClient() {
                             <p className="mt-1 text-xs text-[#8b919a]">
                               When the instance first becomes active, comment on the ClickUp task
                               whose ID matches the branch name (e.g.{' '}
-                              <span className="font-mono">cicm-4491</span>). Uses the token and
+                              <span className="font-mono">proj-4491</span>). Uses the token and
                               workspace ID from global Settings. Requires Public URL.
                             </p>
                           </div>
@@ -574,14 +618,14 @@ export default function ProjectSettingsClient() {
                       </div>
                     </form>
 
-                    <div className="mt-8 border-t border-[#3d4048] pt-6">
-                      <h2 className="text-sm font-medium text-[#e8eaed]">Save settings</h2>
-                      <p className="mt-1 text-xs text-[#8b919a]">
-                        Writes Git URL, public URL, lifetime, health check, Discord, and ClickUp
-                        settings for this project.
+                    <div className="-mx-5 mt-6 flex flex-wrap items-center justify-between gap-3 border-y border-[#3d4048] bg-[#16181b] px-5 py-3">
+                      <p className="text-xs text-[#8b919a]">
+                        {saved
+                          ? 'Settings saved.'
+                          : 'Save Git URL, public URL, lifetime, health check, Discord, and ClickUp.'}
                       </p>
                       <button
-                        className="btn btn-primary mt-4"
+                        className="btn btn-success"
                         type="submit"
                         form="project-general-settings"
                         disabled={saving}
@@ -785,27 +829,17 @@ export default function ProjectSettingsClient() {
                         hint="Edit as a table, paste KEY=value text, or load a .env file."
                       />
                     </div>
-                    <div className="mt-4">
+                    <div className="sticky bottom-0 z-10 -mx-5 -mb-5 mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[#3d4048] bg-[#1f2124]/95 px-5 py-3 backdrop-blur">
+                      <p className="text-xs text-[#8b919a]">
+                        {envSaved
+                          ? 'Environment saved. Redeploy instances to apply.'
+                          : 'Applied on create / redeploy. Instance overrides can replace individual keys.'}
+                      </p>
                       <button
                         type="button"
-                        className="btn btn-primary"
+                        className="btn btn-success"
                         disabled={envSaving}
-                        onClick={async () => {
-                          setError(null);
-                          setEnvSaved(false);
-                          setEnvSaving(true);
-                          try {
-                            const updated = await patchProject(id, { envVars });
-                            setProject(updated);
-                            setEnvVars(normalizeEnvVars(updated.envVars));
-                            setEnvSaved(true);
-                            router.refresh();
-                          } catch {
-                            setError('Could not save environment variables.');
-                          } finally {
-                            setEnvSaving(false);
-                          }
-                        }}
+                        onClick={() => void saveEnvironment()}
                       >
                         {envSaving ? 'Saving…' : 'Save environment'}
                       </button>

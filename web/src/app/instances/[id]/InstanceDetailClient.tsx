@@ -647,7 +647,7 @@ export default function InstanceDetailClient() {
                           ) : (
                             <p className="text-xs text-white/45">
                               No task linked. Branch names like{' '}
-                              <span className="font-mono">cicm-4491</span> are matched
+                              <span className="font-mono">proj-4491</span> are matched
                               automatically when ClickUp is configured.
                             </p>
                           )}
@@ -661,7 +661,7 @@ export default function InstanceDetailClient() {
                                   className="input min-w-0 flex-1 font-mono text-sm"
                                   value={clickupInput}
                                   onChange={(e) => setClickupInput(e.target.value)}
-                                  placeholder="https://app.clickup.com/t/CICM-4491"
+                                  placeholder="https://app.clickup.com/t/PROJ-4491"
                                   disabled={clickupSaving || statusBusy}
                                 />
                                 <button

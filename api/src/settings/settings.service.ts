@@ -13,6 +13,12 @@ export const DISCORD_MESSAGE_TEMPLATE_KEY = 'discord_message_template';
 export const CLICKUP_API_TOKEN_KEY = 'clickup_api_token';
 export const CLICKUP_TEAM_ID_KEY = 'clickup_team_id';
 export const CLICKUP_COMMENT_TEMPLATE_KEY = 'clickup_comment_template';
+export const AMPLIFY_APP_ID_KEY = 'amplify_app_id';
+export const AMPLIFY_REGION_KEY = 'amplify_region';
+export const AMPLIFY_ACCESS_KEY_ID_KEY = 'amplify_access_key_id';
+export const AMPLIFY_SECRET_ACCESS_KEY_KEY = 'amplify_secret_access_key';
+export const AMPLIFY_HIDDEN_BRANCHES_KEY = 'amplify_hidden_branches';
+export const AMPLIFY_MAX_BRANCHES_KEY = 'amplify_max_branches';
 
 @Injectable()
 export class SettingsService implements OnModuleInit {

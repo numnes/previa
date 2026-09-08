@@ -2,7 +2,7 @@
 
 import { PageContainer } from '@/components/PageContainer';
 import { PageHeader } from '@/components/PageHeader';
-import { ReloadButton } from '@/components/ReloadButton';
+import { AUTO_RELOAD_INTERVAL_MS, ReloadButton } from '@/components/ReloadButton';
 import { NodeBadge } from '@/components/NodeBadge';
 import { RequireAuth } from '@/components/RequireAuth';
 import {
@@ -210,7 +210,13 @@ export default function HomePage() {
         <PageHeader
           title="Dashboard"
           subtitle="Host resources and preview activity across connected machines."
-          action={<ReloadButton onReload={load} title="Reload dashboard" />}
+          action={
+            <ReloadButton
+              onReload={load}
+              title="Reload dashboard"
+              intervalMs={AUTO_RELOAD_INTERVAL_MS}
+            />
+          }
         />
         {err ? <div className="alert-error mb-4">{err}</div> : null}
         <div className="grid gap-5 lg:grid-cols-2">

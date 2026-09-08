@@ -10,6 +10,7 @@ import { ApiKeysSection } from './ApiKeysSection';
 import { ClusterSettingsSection } from './ClusterSettingsSection';
 import { DiscordNotificationsSection } from './DiscordNotificationsSection';
 import { ClickupNotificationsSection } from './ClickupNotificationsSection';
+import { AmplifySettingsSection } from './AmplifySettingsSection';
 import { fetchSettings, patchSettings } from './::handlers/settings';
 
 export default function SettingsPage() {
@@ -53,7 +54,7 @@ export default function SettingsPage() {
           </div>
           <PageHeader
             title="Settings"
-            subtitle="Global limits, API keys, node identity, and multi-machine cluster connections."
+            subtitle="Global limits, API keys, node identity, Amplify, and multi-machine cluster connections."
           />
 
           <div className="space-y-5">
@@ -131,6 +132,10 @@ export default function SettingsPage() {
 
             <div className="card p-5">
               <ClickupNotificationsSection />
+            </div>
+
+            <div className="card p-5">
+              <AmplifySettingsSection />
             </div>
 
             <div className="card p-5">

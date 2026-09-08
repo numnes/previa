@@ -92,6 +92,14 @@ export function IconServer({ className = 'h-4 w-4' }: { className?: string }) {
   );
 }
 
+export function IconCloud({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.3-1.6A4.5 4.5 0 0 0 6.5 19Z" />
+    </svg>
+  );
+}
+
 export function IconLogout({ className = 'h-4 w-4' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">

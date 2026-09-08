@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import {
   IconBook,
   IconChevron,
+  IconCloud,
   IconDashboard,
   IconFolder,
   IconGithub,
@@ -200,6 +201,7 @@ export function Sidebar() {
         icon: <IconFolder />,
         children: [
           { href: "/instances", label: "Instances", icon: <IconLayers /> },
+          { href: "/amplify", label: "Amplify", icon: <IconCloud /> },
         ],
       },
     ];

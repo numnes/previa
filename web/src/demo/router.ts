@@ -109,6 +109,9 @@ export async function demoFetchJson<T>(
   if (parts[0] === 'settings') {
     return handleSettings(method, body, user) as T;
   }
+  if (parts[0] === 'amplify') {
+    return handleAmplify(method, parts, body, user) as T;
+  }
   if (parts[0] === 'cluster-keys') {
     return handleClusterKeys(method, parts, body, user) as T;
   }
@@ -347,26 +350,126 @@ function handleUsers(
 function handleSettings(method: string, body: unknown, user: AuthUser) {
   requireAdmin(user);
   const s = getDemoStore();
+  const amplifyPayload = () => ({
+    amplifyAppId: s.settings.amplifyAppId,
+    amplifyRegion: s.settings.amplifyRegion,
+    amplifyHiddenBranches: s.settings.amplifyHiddenBranches,
+    amplifyHiddenBranchesText: s.settings.amplifyHiddenBranches.join('\n'),
+    amplifyMaxBranches: s.settings.amplifyMaxBranches,
+    amplifyAccessKeyConfigured: s.settings.amplifyAccessKeyConfigured,
+    amplifyAccessKeyLast4: s.settings.amplifyAccessKeyLast4,
+    amplifySecretConfigured: s.settings.amplifySecretConfigured,
+  });
   if (method === 'GET') {
     return {
       maxActiveInstancesParsed: s.settings.maxActiveInstances,
       max_active_instances: String(s.settings.maxActiveInstances),
       nodeLabel: s.settings.nodeLabel,
+      ...amplifyPayload(),
     };
   }
   if (method === 'PATCH') {
-    const b = body as { maxActiveInstances?: number; nodeLabel?: string };
+    const b = body as {
+      maxActiveInstances?: number;
+      nodeLabel?: string;
+      amplifyAppId?: string;
+      amplifyRegion?: string;
+      amplifyAccessKeyId?: string;
+      amplifySecretAccessKey?: string;
+      amplifyHiddenBranches?: string;
+      amplifyMaxBranches?: number;
+    };
     if (b.maxActiveInstances != null) {
       s.settings.maxActiveInstances = b.maxActiveInstances;
     }
     if (b.nodeLabel != null) s.settings.nodeLabel = b.nodeLabel;
+    if (b.amplifyAppId !== undefined) s.settings.amplifyAppId = b.amplifyAppId.trim();
+    if (b.amplifyRegion !== undefined) {
+      s.settings.amplifyRegion = b.amplifyRegion.trim() || 'us-east-1';
+    }
+    if (b.amplifyAccessKeyId !== undefined) {
+      const key = b.amplifyAccessKeyId.trim();
+      s.settings.amplifyAccessKeyConfigured = !!key;
+      s.settings.amplifyAccessKeyLast4 = key ? key.slice(-4) : '';
+    }
+    if (b.amplifySecretAccessKey !== undefined) {
+      s.settings.amplifySecretConfigured = !!b.amplifySecretAccessKey.trim();
+    }
+    if (b.amplifyHiddenBranches !== undefined) {
+      s.settings.amplifyHiddenBranches = b.amplifyHiddenBranches
+        .split(/[\n,]+/)
+        .map((n) => n.trim())
+        .filter(Boolean);
+    }
+    if (b.amplifyMaxBranches != null) {
+      const n = Math.floor(b.amplifyMaxBranches);
+      s.settings.amplifyMaxBranches = Number.isFinite(n) && n >= 1 ? Math.min(n, 1000) : 50;
+    }
     return {
       maxActiveInstancesParsed: s.settings.maxActiveInstances,
       max_active_instances: String(s.settings.maxActiveInstances),
       nodeLabel: s.settings.nodeLabel,
+      ...amplifyPayload(),
     };
   }
   throw new DemoHttpError(404, 'Unknown settings route');
+}
+
+function handleAmplify(
+  method: string,
+  parts: string[],
+  body: unknown,
+  _user: AuthUser,
+) {
+  const s = getDemoStore();
+  const hidden = new Set(
+    s.settings.amplifyHiddenBranches.map((n) => n.trim().toLowerCase()),
+  );
+  if (method === 'GET' && parts[1] === 'branches' && parts.length === 2) {
+    const visible = s.amplifyBranches.filter(
+      (b) => !hidden.has(b.branchName.toLowerCase()),
+    );
+    const slotLimit = s.settings.amplifyMaxBranches || 50;
+    const slotUsed = s.amplifyBranches.length;
+    return {
+      configured: !!s.settings.amplifyAppId,
+      appId: s.settings.amplifyAppId || null,
+      appName: 'storefront-web',
+      defaultDomain: `${s.settings.amplifyAppId || 'demo'}.amplifyapp.com`,
+      region: s.settings.amplifyRegion,
+      hiddenBranches: s.settings.amplifyHiddenBranches,
+      hiddenCount: s.amplifyBranches.length - visible.length,
+      slotUsed,
+      slotLimit,
+      slotAvailable: Math.max(0, slotLimit - slotUsed),
+      clickupConfigured: true,
+      branches: visible,
+    };
+  }
+  if (
+    method === 'POST' &&
+    parts[1] === 'branches' &&
+    parts[2] === 'delete' &&
+    parts.length === 3
+  ) {
+    const name = String((body as { branchName?: string })?.branchName ?? '').trim();
+    if (!name) throw new DemoHttpError(400, 'Informe o nome da branch.');
+    if (hidden.has(name.toLowerCase())) {
+      throw new DemoHttpError(
+        400,
+        `A branch "${name}" está oculta nas configurações e não pode ser removida por aqui.`,
+      );
+    }
+    const before = s.amplifyBranches.length;
+    s.amplifyBranches = s.amplifyBranches.filter(
+      (b) => b.branchName.toLowerCase() !== name.toLowerCase(),
+    );
+    if (s.amplifyBranches.length === before) {
+      throw new DemoHttpError(400, `App ou branch Amplify não encontrado. Confira o App ID, a região e o nome da branch.`);
+    }
+    return { ok: true, branchName: name };
+  }
+  throw new DemoHttpError(404, 'Unknown amplify route');
 }
 
 function handleClusterKeys(

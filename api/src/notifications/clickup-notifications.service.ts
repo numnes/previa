@@ -122,7 +122,7 @@ export class ClickupNotificationsService {
     const taskRef = parseClickupTaskRef(trimmed);
     if (!taskRef) {
       throw new BadRequestException(
-        'URL ou ID ClickUp inválido. Use um link app.clickup.com/t/… ou um ID (ex.: CICM-123).',
+        'URL ou ID ClickUp inválido. Use um link app.clickup.com/t/… ou um ID (ex.: PROJ-123).',
       );
     }
 
@@ -160,7 +160,7 @@ export class ClickupNotificationsService {
     const taskRef = extractClickupTaskId(row.branch);
     if (!taskRef) {
       throw new BadRequestException(
-        `Branch "${row.branch}" não contém um ID de tarefa ClickUp (ex.: cicm-4491 ou feature/CICM-123).`,
+        `Branch "${row.branch}" não contém um ID de tarefa ClickUp (ex.: proj-4491 ou feature/PROJ-123).`,
       );
     }
 
@@ -315,7 +315,7 @@ export class ClickupNotificationsService {
       teamIds = await this.listAuthorizedTeamIds(token);
       if (!teamIds.length) {
         throw new BadRequestException(
-          'IDs customizados do ClickUp (ex.: CICM-123) exigem o Workspace (Team) ID em Settings, e o token não retornou nenhum workspace.',
+          'IDs customizados do ClickUp (ex.: PROJ-123) exigem o Workspace (Team) ID em Settings, e o token não retornou nenhum workspace.',
         );
       }
     }

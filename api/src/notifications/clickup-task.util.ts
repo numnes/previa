@@ -1,4 +1,4 @@
-/** ClickUp custom task id like CICM-4491 (prefix-number). */
+/** ClickUp custom task id like PROJ-4491 (prefix-number). */
 export function isClickupCustomTaskId(taskId: string): boolean {
   return /^[A-Za-z][A-Za-z0-9]*-\d+$/.test(taskId.trim());
 }
@@ -32,9 +32,9 @@ export function extractClickupTaskId(branch: string): string | null {
  * Accepts a ClickUp task URL or a bare task / custom ID.
  * Examples:
  * - https://app.clickup.com/t/86abc123
- * - https://app.clickup.com/t/CICM-4491
+ * - https://app.clickup.com/t/PROJ-4491
  * - https://app.clickup.com/123/v/li/456/t/86abc123
- * - CICM-4491
+ * - PROJ-4491
  */
 export function parseClickupTaskRef(input: string): string | null {
   const trimmed = input.trim();

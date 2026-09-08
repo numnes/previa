@@ -20,6 +20,14 @@ export type SettingsPayload = {
   clickupApiTokenLast4?: string;
   clickupTeamId?: string;
   clickupCommentTemplate?: string;
+  amplifyAppId?: string;
+  amplifyRegion?: string;
+  amplifyHiddenBranches?: string[];
+  amplifyHiddenBranchesText?: string;
+  amplifyMaxBranches?: number;
+  amplifyAccessKeyConfigured?: boolean;
+  amplifyAccessKeyLast4?: string;
+  amplifySecretConfigured?: boolean;
   [key: string]: unknown;
 };
 
@@ -39,6 +47,12 @@ export async function patchSettings(body: {
   clickupApiToken?: string;
   clickupTeamId?: string;
   clickupCommentTemplate?: string;
+  amplifyAppId?: string;
+  amplifyRegion?: string;
+  amplifyAccessKeyId?: string;
+  amplifySecretAccessKey?: string;
+  amplifyHiddenBranches?: string;
+  amplifyMaxBranches?: number;
 }): Promise<SettingsPayload> {
   const token = getTokenClient();
   return await httpJson<SettingsPayload>(`${apiBaseClient()}/settings`, {

@@ -55,7 +55,7 @@ export class PatchSettingsDto {
 
   @ApiPropertyOptional({
     example: '123456',
-    description: 'ClickUp workspace (team) ID, required to resolve custom task IDs like CICM-123.',
+    description: 'ClickUp workspace (team) ID, required to resolve custom task IDs like PROJ-123.',
   })
   @IsOptional()
   @IsString()
@@ -68,6 +68,57 @@ export class PatchSettingsDto {
   @IsOptional()
   @IsString()
   clickupCommentTemplate?: string;
+
+  @ApiPropertyOptional({
+    example: 'd0exampleappid',
+    description: 'AWS Amplify App ID. Empty string clears it.',
+  })
+  @IsOptional()
+  @IsString()
+  amplifyAppId?: string | null;
+
+  @ApiPropertyOptional({
+    example: 'us-east-1',
+    description: 'AWS region of the Amplify app. Empty uses us-east-1.',
+  })
+  @IsOptional()
+  @IsString()
+  amplifyRegion?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'IAM access key id used to call Amplify. Empty string clears it. Omit to keep current.',
+  })
+  @IsOptional()
+  @IsString()
+  amplifyAccessKeyId?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'IAM secret access key used to call Amplify. Empty string clears it. Omit to keep current.',
+  })
+  @IsOptional()
+  @IsString()
+  amplifySecretAccessKey?: string | null;
+
+  @ApiPropertyOptional({
+    example: 'main\ndevelop',
+    description:
+      'Amplify branch names hidden from the listing (one per line or comma-separated). Empty clears the list.',
+  })
+  @IsOptional()
+  @IsString()
+  amplifyHiddenBranches?: string | null;
+
+  @ApiPropertyOptional({
+    example: 50,
+    description:
+      'Amplify branch slot limit (AWS default is 50 per app). Used for the used/available display.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  amplifyMaxBranches?: number;
 }
 
 export { DISCORD_NOTIFY_STATUSES, serializeDiscordNotifyStatuses };

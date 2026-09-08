@@ -3,6 +3,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AmplifyModule } from './amplify/amplify.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { AuthModule } from './auth/auth.module';
 import { ClusterKeysModule } from './cluster-keys/cluster-keys.module';
@@ -67,6 +68,7 @@ import { UsersModule } from './users/users.module';
       inject: [ConfigService],
     }),
     AuthModule,
+    AmplifyModule,
     ApiKeysModule,
     ClusterKeysModule,
     ClusterNodesModule,
