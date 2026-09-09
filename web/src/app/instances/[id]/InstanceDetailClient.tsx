@@ -106,12 +106,17 @@ export default function InstanceDetailClient() {
           const fresh = await getInstance(id);
           setRow(fresh);
           setEnvVars(normalizeEnvVars(fresh.envVars));
-          if (TERMINAL_STATUSES.has(fresh.status)) {
+          if (
+            TERMINAL_STATUSES.has(fresh.status) &&
+            !fresh.zeroDowntimeInProgress
+          ) {
             return fresh;
           }
           toast.update(toastId, {
             title: pendingTitle,
-            description: `Current status: ${fresh.status}…`,
+            description: fresh.zeroDowntimeInProgress
+              ? 'Zero-downtime redeploy in progress…'
+              : `Current status: ${fresh.status}…`,
             variant: 'loading',
           });
         } catch {
@@ -155,6 +160,26 @@ export default function InstanceDetailClient() {
     if (!row || tab !== 'logs') return;
     void loadLogs();
   }, [row, tab, loadLogs]);
+
+  useEffect(() => {
+    if (!row?.zeroDowntimeInProgress) return;
+    let alive = true;
+    const tick = async () => {
+      try {
+        const fresh = await getInstance(id);
+        if (!alive) return;
+        setRow(fresh);
+        setEnvVars(normalizeEnvVars(fresh.envVars));
+      } catch {
+        // ignore
+      }
+    };
+    const handle = window.setInterval(() => void tick(), 2000);
+    return () => {
+      alive = false;
+      window.clearInterval(handle);
+    };
+  }, [id, row?.zeroDowntimeInProgress]);
 
   const reloadAll = useCallback(async () => {
     await loadDetail();
@@ -220,6 +245,12 @@ export default function InstanceDetailClient() {
           description: 'Check the error banner for details.',
           variant: 'error',
         });
+      } else if (r?.status === 'active' && r.lastDeployError) {
+        toast.update(toastId, {
+          title: 'Zero-downtime deploy failed',
+          description: 'Previous version is still serving. See the banner for details.',
+          variant: 'error',
+        });
       } else {
         toast.update(toastId, {
           title: 'Status updated',
@@ -232,13 +263,22 @@ export default function InstanceDetailClient() {
     try {
       let r = await activateInstance(id);
       setRow(r);
-      if (r.status === 'deploying') {
+      if (r.status === 'deploying' || r.zeroDowntimeInProgress) {
         toast.update(toastId, {
-          title: 'Deploy in progress…',
-          description: 'Waiting until the instance leaves deploying.',
+          title: r.zeroDowntimeInProgress
+            ? 'Zero-downtime redeploy…'
+            : 'Deploy in progress…',
+          description: r.zeroDowntimeInProgress
+            ? 'Building in parallel; previous version still serving.'
+            : 'Waiting until the instance leaves deploying.',
           variant: 'loading',
         });
-        const settled = await waitUntilStatusSettled(toastId, 'Deploy in progress…');
+        const settled = await waitUntilStatusSettled(
+          toastId,
+          r.zeroDowntimeInProgress
+            ? 'Zero-downtime redeploy…'
+            : 'Deploy in progress…',
+        );
         if (settled) r = settled;
       }
       finishFromStatus(r);
@@ -247,13 +287,20 @@ export default function InstanceDetailClient() {
       try {
         let fresh = await getInstance(id);
         setRow(fresh);
-        if (fresh.status === 'deploying') {
+        if (fresh.status === 'deploying' || fresh.zeroDowntimeInProgress) {
           toast.update(toastId, {
-            title: 'Deploy in progress…',
+            title: fresh.zeroDowntimeInProgress
+              ? 'Zero-downtime redeploy…'
+              : 'Deploy in progress…',
             description: 'Request timed out, but deploy is still running. Waiting…',
             variant: 'loading',
           });
-          const settled = await waitUntilStatusSettled(toastId, 'Deploy in progress…');
+          const settled = await waitUntilStatusSettled(
+            toastId,
+            fresh.zeroDowntimeInProgress
+              ? 'Zero-downtime redeploy…'
+              : 'Deploy in progress…',
+          );
           finishFromStatus(settled);
         } else if (TERMINAL_STATUSES.has(fresh.status)) {
           finishFromStatus(fresh);
@@ -440,6 +487,34 @@ export default function InstanceDetailClient() {
               </div>
             ) : null}
 
+            {row.zeroDowntimeInProgress ? (
+              <div className="rounded-xl border border-sky-400/30 bg-sky-950/40 p-4">
+                <h2 className="text-sm font-semibold text-sky-100">
+                  Zero-downtime redeploy in progress
+                </h2>
+                <p className="mt-1 text-xs text-sky-200/80">
+                  A new version is building and starting in parallel. The current version keeps
+                  serving until the health check passes and nginx switches over.
+                </p>
+              </div>
+            ) : null}
+
+            {row.status === 'active' && row.lastDeployError && !row.zeroDowntimeInProgress ? (
+              <div className="rounded-xl border border-amber-400/30 bg-amber-950/40 p-4">
+                <h2 className="text-sm font-semibold text-amber-100">
+                  Deploy failed — previous version still serving
+                </h2>
+                <p className="mt-1 text-xs text-amber-200/70">
+                  Zero-downtime redeploy did not cut over. Branch{' '}
+                  <span className="font-mono">{row.branch}</span> remains on the last healthy
+                  version.
+                </p>
+                <pre className="mt-3 max-h-64 overflow-auto rounded-lg border border-amber-400/20 bg-black/40 p-3 font-mono text-xs leading-relaxed text-amber-50/90 whitespace-pre-wrap">
+                  {row.lastDeployError}
+                </pre>
+              </div>
+            ) : null}
+
             {row.status === 'error' && row.lastDeployError ? (
               <div className="rounded-xl border border-rose-400/30 bg-rose-950/40 p-4">
                 <h2 className="text-sm font-semibold text-rose-100">Deploy failed</h2>
@@ -492,13 +567,20 @@ export default function InstanceDetailClient() {
                       <button
                         type="button"
                         className="btn btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={statusBusy || row.status !== 'active' || !row.canWrite}
+                        disabled={
+                          statusBusy ||
+                          row.zeroDowntimeInProgress ||
+                          row.status !== 'active' ||
+                          !row.canWrite
+                        }
                         title={
-                          statusBusy
-                            ? 'Status change in progress'
-                            : row.status !== 'active'
-                              ? 'Only active instances can be paused'
-                              : undefined
+                          row.zeroDowntimeInProgress
+                            ? 'Zero-downtime redeploy in progress'
+                            : statusBusy
+                              ? 'Status change in progress'
+                              : row.status !== 'active'
+                                ? 'Only active instances can be paused'
+                                : undefined
                         }
                         onClick={() => void runPause()}
                       >
@@ -524,10 +606,17 @@ export default function InstanceDetailClient() {
                           className="btn text-sm disabled:cursor-not-allowed disabled:opacity-50"
                           disabled={
                             statusBusy ||
+                            row.zeroDowntimeInProgress ||
                             !row.canWrite ||
                             !['waiting', 'paused', 'error', 'active'].includes(row.status)
                           }
-                          title={statusBusy ? 'Status change in progress' : undefined}
+                          title={
+                            row.zeroDowntimeInProgress
+                              ? 'Zero-downtime redeploy in progress'
+                              : statusBusy
+                                ? 'Status change in progress'
+                                : undefined
+                          }
                           onClick={() => void runActivate()}
                         >
                           {statusAction === 'activate' ? 'Working…' : 'Activate / redeploy'}
@@ -536,17 +625,24 @@ export default function InstanceDetailClient() {
                       <button
                         type="button"
                         className="btn text-sm border-rose-200/30 bg-rose-200/10 text-rose-100 hover:bg-rose-200/15 disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={statusBusy || !row.canWrite}
-                        title={statusBusy ? 'Status change in progress' : undefined}
+                        disabled={statusBusy || row.zeroDowntimeInProgress || !row.canWrite}
+                        title={
+                          row.zeroDowntimeInProgress
+                            ? 'Zero-downtime redeploy in progress'
+                            : statusBusy
+                              ? 'Status change in progress'
+                              : undefined
+                        }
                         onClick={() => void runRemove()}
                       >
                         {statusAction === 'remove' ? 'Removing…' : 'Remove'}
                       </button>
                     </div>
-                    {statusBusy ? (
+                    {statusBusy || row.zeroDowntimeInProgress ? (
                       <p className="mt-2 text-sm text-sky-200/80">
-                        Status change in progress — pause, awake, and activate stay locked until it
-                        finishes.
+                        {row.zeroDowntimeInProgress
+                          ? 'Zero-downtime redeploy in progress — previous version still serving.'
+                          : 'Status change in progress — pause, awake, and activate stay locked until it finishes.'}
                       </p>
                     ) : null}
                     <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
@@ -561,6 +657,15 @@ export default function InstanceDetailClient() {
                             {row.status}
                             {row.status === 'paused' && row.idleSleep ? ' · idle' : ''}
                           </span>
+                          {row.zeroDowntimeInProgress ? (
+                            <span className="rounded-full border border-sky-400/40 bg-sky-500/15 px-2 py-0.5 text-[10px] font-medium tracking-wide text-sky-100 uppercase">
+                              ZD
+                            </span>
+                          ) : row.zeroDowntimeEffective ? (
+                            <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-medium tracking-wide text-white/60 uppercase">
+                              ZD
+                            </span>
+                          ) : null}
                           {statusBusy ? (
                             <span className="text-xs text-sky-300/80">(updating)</span>
                           ) : null}
@@ -615,6 +720,80 @@ export default function InstanceDetailClient() {
                             </Link>
                           ) : (
                             <span className="text-white/45">—</span>
+                          )}
+                        </dd>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <dt className="text-white/55">Zero-downtime</dt>
+                        <dd className="mt-1">
+                          {row.projectZeroDowntimeEnabled ? (
+                            <p className="text-sm text-white/80">
+                              Enabled for the whole project
+                              <span className="ml-2 rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-medium tracking-wide text-white/60 uppercase">
+                                ZD
+                              </span>
+                            </p>
+                          ) : row.isLocal && admin ? (
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="min-w-0">
+                                <p className="text-sm text-white/80">
+                                  {row.zeroDowntimeEnabled
+                                    ? 'Enabled for this branch'
+                                    : 'Off for this branch'}
+                                </p>
+                                <p className="mt-1 text-xs text-white/45">
+                                  Builds a parallel version and switches nginx only after health
+                                  check. Requires a health check path on the project.
+                                </p>
+                                {!row.projectHealthCheckConfigured && !row.zeroDowntimeEnabled ? (
+                                  <p className="mt-1 text-xs text-amber-200/80">
+                                    Configure a health check path in project settings first.
+                                  </p>
+                                ) : null}
+                              </div>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={!!row.zeroDowntimeEnabled}
+                                disabled={
+                                  statusBusy ||
+                                  row.zeroDowntimeInProgress ||
+                                  (!row.projectHealthCheckConfigured && !row.zeroDowntimeEnabled)
+                                }
+                                className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                                  row.zeroDowntimeEnabled ? 'bg-emerald-500/80' : 'bg-[#3d4048]'
+                                }`}
+                                onClick={() => {
+                                  void (async () => {
+                                    const next = !row.zeroDowntimeEnabled;
+                                    if (next && !row.projectHealthCheckConfigured) return;
+                                    setError(null);
+                                    try {
+                                      const updated = await patchInstance(id, {
+                                        zeroDowntimeEnabled: next,
+                                      });
+                                      setRow(updated);
+                                    } catch (e) {
+                                      setError(
+                                        e instanceof Error
+                                          ? e.message
+                                          : 'Could not update zero-downtime setting.',
+                                      );
+                                    }
+                                  })();
+                                }}
+                              >
+                                <span
+                                  className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition ${
+                                    row.zeroDowntimeEnabled ? 'translate-x-5' : 'translate-x-0'
+                                  }`}
+                                />
+                              </button>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-white/80">
+                              {row.zeroDowntimeEffective ? 'Enabled for this branch' : 'Off'}
+                            </p>
                           )}
                         </dd>
                       </div>

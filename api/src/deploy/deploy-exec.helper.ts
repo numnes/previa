@@ -44,6 +44,7 @@ export async function runCoreDeployScript(
   branch: string,
   image?: string,
   appEnv?: DeployAppEnvInput,
+  options?: { zeroDowntime?: boolean },
 ): Promise<DeployMeta> {
   const coreDir =
     config.get<string>('PREVIA_CORE_DIR') ||
@@ -56,6 +57,9 @@ export async function runCoreDeployScript(
   const env: NodeJS.ProcessEnv = { ...process.env, PREVIA_WORK_ROOT: workRoot };
   if (image) {
     env.PREVIA_IMAGE = image;
+  }
+  if (options?.zeroDowntime) {
+    env.PREVIA_ZERO_DOWNTIME = '1';
   }
 
   env.PREVIA_PORT_ENV_NAMES = resolvePortEnvNames(appEnv?.portEnvNames).join(
@@ -94,6 +98,50 @@ export async function runCoreDeployScript(
   const meta = JSON.parse(raw) as DeployMeta;
   await unlink(metaPath).catch(() => undefined);
   return meta;
+}
+
+export async function runCorePromoteZeroDowntime(
+  config: ConfigService,
+  projectSlug: string,
+  branch: string,
+  meta: DeployMeta,
+): Promise<void> {
+  const coreDir =
+    config.get<string>('PREVIA_CORE_DIR') ||
+    join(__dirname, '..', '..', '..', 'core');
+  const workRoot = config.get<string>('PREVIA_WORK_ROOT');
+  if (!workRoot) {
+    throw new Error('PREVIA_WORK_ROOT não configurado');
+  }
+  const stagingName = meta.stagingPm2Name || meta.pm2Name;
+  const stagingColor = meta.stagingColor || 'next';
+  const script = join(coreDir, 'bin', 'promote-zd.sh');
+  await execFileAsync(
+    script,
+    [projectSlug, branch, String(meta.port), stagingColor, stagingName],
+    { env: { ...process.env, PREVIA_WORK_ROOT: workRoot }, maxBuffer: 2 * 1024 * 1024 },
+  );
+}
+
+export async function runCoreAbortZeroDowntime(
+  config: ConfigService,
+  projectSlug: string,
+  branch: string,
+  meta: DeployMeta,
+): Promise<void> {
+  const coreDir =
+    config.get<string>('PREVIA_CORE_DIR') ||
+    join(__dirname, '..', '..', '..', 'core');
+  const workRoot = config.get<string>('PREVIA_WORK_ROOT');
+  if (!workRoot) {
+    throw new Error('PREVIA_WORK_ROOT não configurado');
+  }
+  const stagingName = meta.stagingPm2Name || meta.pm2Name;
+  const script = join(coreDir, 'bin', 'abort-zd.sh');
+  await execFileAsync(script, [projectSlug, branch, stagingName], {
+    env: { ...process.env, PREVIA_WORK_ROOT: workRoot },
+    maxBuffer: 2 * 1024 * 1024,
+  });
 }
 
 export async function runCorePauseScript(

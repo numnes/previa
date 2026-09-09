@@ -65,6 +65,7 @@ export async function patchInstance(
     envVars?: Record<string, string>;
     clickupTaskUrl?: string | null;
     clickupLinkFromBranch?: boolean;
+    zeroDowntimeEnabled?: boolean;
   },
 ): Promise<InstanceRow> {
   const token = getTokenClient();

@@ -21,6 +21,8 @@ export type Project = {
   /** Discord instance status notifications for this project. */
   notificationsEnabled?: boolean;
   clickupCommentsEnabled?: boolean;
+  /** Zero-downtime redeploys for every branch (requires health check). */
+  zeroDowntimeEnabled?: boolean;
   envVars?: Record<string, string>;
   /** Extras além de PORT, SERVER_PORT, APP_PORT */
   portEnvNames?: string[];
@@ -72,6 +74,7 @@ export async function patchProject(
     healthCheckTimeoutMinutes?: number | null;
     notificationsEnabled?: boolean;
     clickupCommentsEnabled?: boolean;
+    zeroDowntimeEnabled?: boolean;
     envVars?: Record<string, string>;
     portEnvNames?: string[];
   },

@@ -93,6 +93,17 @@ export class PreviewInstance {
   @Column({ name: 'env_vars', type: 'jsonb', default: () => "'{}'" })
   envVars: Record<string, string>;
 
+  /**
+   * Per-instance zero-downtime. Only applied when the project flag is off.
+   * Requires project healthCheckPath when enabled.
+   */
+  @Column({ name: 'zero_downtime_enabled', type: 'boolean', default: false })
+  zeroDowntimeEnabled: boolean;
+
+  /** True while a zero-downtime staging build/cutover is in progress. */
+  @Column({ name: 'zero_downtime_in_progress', type: 'boolean', default: false })
+  zeroDowntimeInProgress: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

@@ -59,7 +59,8 @@ export class InstancesService {
     if (
       dto.envVars === undefined &&
       dto.clickupTaskUrl === undefined &&
-      dto.clickupLinkFromBranch === undefined
+      dto.clickupLinkFromBranch === undefined &&
+      dto.zeroDowntimeEnabled === undefined
     ) {
       return this.getOneForApi(id);
     }
@@ -74,6 +75,13 @@ export class InstancesService {
       const row = await this.previewInstances.updateClickupTaskLink(
         id,
         dto.clickupTaskUrl,
+      );
+      return this.cluster.tagLocal(row);
+    }
+    if (dto.zeroDowntimeEnabled !== undefined) {
+      const row = await this.previewInstances.updateZeroDowntimeEnabled(
+        id,
+        dto.zeroDowntimeEnabled,
       );
       return this.cluster.tagLocal(row);
     }

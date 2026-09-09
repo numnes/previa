@@ -277,20 +277,39 @@ function InstancesPageContent() {
                   {i.port ?? '—'}
                 </td>
                 <td className="border-b border-white/10 px-3 py-2 text-white/70">
-                  <span
-                    className={instanceStatusBadgeClass(i.status, {
-                      idleSleep: !!i.idleSleep,
-                    })}
-                  >
-                    {i.status}
-                    {i.status === 'paused' && i.idleSleep ? ' · idle' : ''}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span
+                      className={instanceStatusBadgeClass(i.status, {
+                        idleSleep: !!i.idleSleep,
+                      })}
+                    >
+                      {i.status}
+                      {i.status === 'paused' && i.idleSleep ? ' · idle' : ''}
+                    </span>
+                    {i.zeroDowntimeInProgress ? (
+                      <span className="rounded-full border border-sky-400/40 bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-sky-100 uppercase">
+                        ZD…
+                      </span>
+                    ) : i.zeroDowntimeEffective ? (
+                      <span className="rounded-full border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-white/55 uppercase">
+                        ZD
+                      </span>
+                    ) : null}
+                  </div>
                   {i.status === 'error' && i.lastDeployError ? (
                     <p
                       className="mt-1 max-w-xs truncate font-mono text-xs text-rose-200/80"
                       title={i.lastDeployError}
                     >
                       {i.lastDeployError.split('\n')[0]}
+                    </p>
+                  ) : null}
+                  {i.status === 'active' && i.lastDeployError && !i.zeroDowntimeInProgress ? (
+                    <p
+                      className="mt-1 max-w-xs truncate font-mono text-xs text-amber-200/80"
+                      title={i.lastDeployError}
+                    >
+                      ZD failed — previous version still serving
                     </p>
                   ) : null}
                 </td>

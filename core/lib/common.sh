@@ -61,6 +61,82 @@ pm2_app_name() {
   instance_name "$@"
 }
 
+# Zero-downtime flip-flop: primary | next
+zd_opposite_color() {
+  if [[ "$1" == "next" ]]; then
+    echo "primary"
+  else
+    echo "next"
+  fi
+}
+
+read_live_color() {
+  local base_name="$1"
+  local f="${PREVIA_STATE_DIR}/${base_name}.live"
+  if [[ -f "$f" ]]; then
+    local c
+    c="$(tr -d '[:space:]' <"$f")"
+    if [[ "$c" == "next" || "$c" == "primary" ]]; then
+      echo "$c"
+      return 0
+    fi
+  fi
+  echo "primary"
+}
+
+write_live_color() {
+  local base_name="$1"
+  local color="$2"
+  echo "$color" >"${PREVIA_STATE_DIR}/${base_name}.live"
+}
+
+# Runtime process/container name for a color.
+zd_runtime_name() {
+  local base_name="$1"
+  local color="$2"
+  if [[ "$color" == "next" ]]; then
+    echo "${base_name}.next"
+  else
+    echo "$base_name"
+  fi
+}
+
+# Checkout path for a color under PREVIA_WORK_ROOT/project/branchSlug[.next]
+zd_checkout_dir() {
+  local project_slug="$1"
+  local branch_slug="$2"
+  local color="$3"
+  if [[ "$color" == "next" ]]; then
+    echo "${PREVIA_WORK_ROOT}/${project_slug}/${branch_slug}.next"
+  else
+    echo "${PREVIA_WORK_ROOT}/${project_slug}/${branch_slug}"
+  fi
+}
+
+# Stop primary + next runtimes for an instance (pause/sleep/destroy).
+stop_both_instance_colors() {
+  local base_name="$1"
+  stop_instance "$(zd_runtime_name "$base_name" primary)"
+  stop_instance "$(zd_runtime_name "$base_name" next)"
+}
+
+# Remove state files for both colors (ports kept optionally by caller).
+rm_instance_color_state() {
+  local base_name="$1"
+  local keep_ports="${2:-0}"
+  local color name
+  for color in primary next; do
+    name="$(zd_runtime_name "$base_name" "$color")"
+    if [[ "$keep_ports" != "1" ]]; then
+      rm -f "${PREVIA_STATE_DIR}/${name}.port"
+    fi
+    rm -f "${PREVIA_STATE_DIR}/${name}.deploy-result.json"
+    rm -f "${PREVIA_STATE_DIR}/${name}.runner"
+  done
+  rm -f "${PREVIA_STATE_DIR}/${base_name}.deploy-result.json"
+  rm -f "${PREVIA_STATE_DIR}/${base_name}.live"
+}
+
 read_instance_runner() {
   local name="$1"
   local runner_file="${PREVIA_STATE_DIR}/${name}.runner"

@@ -43,6 +43,11 @@ export type InstanceRow = {
   clickupManualLink?: boolean;
   /** Token ClickUp configured in Settings (same on every row). */
   clickupConfigured?: boolean;
+  zeroDowntimeEnabled?: boolean;
+  projectZeroDowntimeEnabled?: boolean;
+  zeroDowntimeEffective?: boolean;
+  zeroDowntimeInProgress?: boolean;
+  projectHealthCheckConfigured?: boolean;
   createdAt: string;
   updatedAt: string;
 } & NodeRef;

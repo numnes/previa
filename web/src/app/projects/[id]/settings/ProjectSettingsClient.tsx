@@ -59,6 +59,7 @@ export default function ProjectSettingsClient() {
   const [healthCheckTimeoutMinutes, setHealthCheckTimeoutMinutes] = useState('');
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [clickupCommentsEnabled, setClickupCommentsEnabled] = useState(false);
+  const [zeroDowntimeEnabled, setZeroDowntimeEnabled] = useState(false);
   const [envVars, setEnvVars] = useState<EnvVarsMap>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -92,6 +93,7 @@ export default function ProjectSettingsClient() {
       );
       setNotificationsEnabled(!!p.notificationsEnabled);
       setClickupCommentsEnabled(!!p.clickupCommentsEnabled);
+      setZeroDowntimeEnabled(!!p.zeroDowntimeEnabled);
       setEnvVars(normalizeEnvVars(p.envVars));
       setInstanceCount(instances.filter((i) => i.projectId === id).length);
     } catch {
@@ -256,6 +258,7 @@ export default function ProjectSettingsClient() {
                               : null,
                             notificationsEnabled,
                             clickupCommentsEnabled,
+                            zeroDowntimeEnabled,
                           });
                           setProject(updated);
                           setGitUrl(updated.gitUrl);
@@ -283,6 +286,7 @@ export default function ProjectSettingsClient() {
                           );
                           setNotificationsEnabled(!!updated.notificationsEnabled);
                           setClickupCommentsEnabled(!!updated.clickupCommentsEnabled);
+                          setZeroDowntimeEnabled(!!updated.zeroDowntimeEnabled);
                           setSaved(true);
                           router.refresh();
                         } catch {
@@ -508,8 +512,49 @@ export default function ProjectSettingsClient() {
                                 <span className="font-mono text-white/75">
                                   http://127.0.0.1:{'{port}'}{'{path}'}
                                 </span>
-                                .
+                                . Required for zero-downtime deploys.
                               </p>
+                            </div>
+                          </div>
+
+                          <div className="border-t border-[#3d4048] pt-5">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <h2 className="text-sm font-medium text-[#e8eaed]">
+                                  Zero-downtime deploys
+                                </h2>
+                                <p className="mt-1 text-xs text-[#8b919a]">
+                                  When enabled, redeploys of an already active branch build and
+                                  start a new version on another port, run the health check, then
+                                  switch nginx — the previous version keeps serving until cutover.
+                                  Applies to every branch; instances cannot opt out. Requires a
+                                  health check path above. Staging does not consume an extra slot.
+                                </p>
+                                {!healthCheckPath.trim() ? (
+                                  <p className="mt-2 text-xs text-amber-200/80">
+                                    Configure a health check path first to enable this option.
+                                  </p>
+                                ) : null}
+                              </div>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={zeroDowntimeEnabled}
+                                disabled={!healthCheckPath.trim() && !zeroDowntimeEnabled}
+                                className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                                  zeroDowntimeEnabled ? 'bg-emerald-500/80' : 'bg-[#3d4048]'
+                                }`}
+                                onClick={() => {
+                                  if (!healthCheckPath.trim() && !zeroDowntimeEnabled) return;
+                                  setZeroDowntimeEnabled((v) => !v);
+                                }}
+                              >
+                                <span
+                                  className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition ${
+                                    zeroDowntimeEnabled ? 'translate-x-5' : 'translate-x-0'
+                                  }`}
+                                />
+                              </button>
                             </div>
                           </div>
                         </div>

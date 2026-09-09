@@ -79,6 +79,13 @@ export class Project {
   @Column({ name: 'clickup_comments_enabled', type: 'boolean', default: false })
   clickupCommentsEnabled: boolean;
 
+  /**
+   * Zero-downtime redeploys for all branches. Requires healthCheckPath.
+   * When true, instances cannot opt out.
+   */
+  @Column({ name: 'zero_downtime_enabled', type: 'boolean', default: false })
+  zeroDowntimeEnabled: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

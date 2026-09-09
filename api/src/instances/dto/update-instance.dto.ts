@@ -29,4 +29,13 @@ export class UpdateInstanceDto {
   @IsOptional()
   @IsBoolean()
   clickupLinkFromBranch?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'Zero-downtime redeploy for this instance. Ignored (forced on) when the project has zero-downtime enabled. Requires project healthCheckPath.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  zeroDowntimeEnabled?: boolean;
 }

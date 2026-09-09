@@ -33,6 +33,7 @@ export class ProjectsService {
       healthCheckTimeoutMinutes: null,
       notificationsEnabled: false,
       clickupCommentsEnabled: false,
+      zeroDowntimeEnabled: false,
     });
     return this.repo.save(p);
   }
@@ -105,6 +106,15 @@ export class ProjectsService {
     }
     if (dto.healthCheckPath !== undefined) {
       const normalized = normalizeHealthCheckPath(dto.healthCheckPath);
+      if (
+        !normalized &&
+        (dto.zeroDowntimeEnabled === true ||
+          (dto.zeroDowntimeEnabled === undefined && p.zeroDowntimeEnabled))
+      ) {
+        throw new BadRequestException(
+          'Cannot clear health check while zero-downtime deploys are enabled. Disable zero-downtime first.',
+        );
+      }
       p.healthCheckPath = normalized;
       if (!normalized) {
         p.healthCheckStatus = null;
@@ -123,6 +133,20 @@ export class ProjectsService {
     }
     if (dto.clickupCommentsEnabled !== undefined) {
       p.clickupCommentsEnabled = dto.clickupCommentsEnabled;
+    }
+    if (dto.zeroDowntimeEnabled !== undefined) {
+      if (dto.zeroDowntimeEnabled) {
+        const hc =
+          dto.healthCheckPath !== undefined
+            ? normalizeHealthCheckPath(dto.healthCheckPath)
+            : normalizeHealthCheckPath(p.healthCheckPath);
+        if (!hc) {
+          throw new BadRequestException(
+            'Zero-downtime deploys require a health check path on the project.',
+          );
+        }
+      }
+      p.zeroDowntimeEnabled = dto.zeroDowntimeEnabled;
     }
     return this.repo.save(p);
   }

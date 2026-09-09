@@ -80,8 +80,11 @@ export class DeployProcessor extends WorkerHost {
       return { ok: true, action: 'queued' };
     }
 
+    const zeroDowntime = reserved === 'run-zd';
     this.logger.log(
-      `Deploy ${job.data.projectSlug}/${job.data.branch} — clone/fetch + build (inclui instância em idle sleep)`,
+      zeroDowntime
+        ? `Zero-downtime deploy ${job.data.projectSlug}/${job.data.branch} — staging build`
+        : `Deploy ${job.data.projectSlug}/${job.data.branch} — clone/fetch + build (inclui instância em idle sleep)`,
     );
 
     try {
@@ -96,11 +99,15 @@ export class DeployProcessor extends WorkerHost {
         job.data.branch,
         job.data.image,
         appEnv,
+        { zeroDowntime },
       );
       await this.previewInstances.awaitHealthCheckAndFinalize(meta);
     } catch (e) {
       const msg = formatDeployError(e);
-      if (!msg.includes('Health check timeout')) {
+      if (
+        !msg.includes('Health check timeout') &&
+        !msg.includes('Zero-downtime health check timeout')
+      ) {
         await this.previewInstances.finalizeDeployError(
           job.data.projectSlug,
           job.data.branch,
@@ -110,7 +117,7 @@ export class DeployProcessor extends WorkerHost {
       throw e;
     }
     await this.previewInstances.processWaitingQueue();
-    return { ok: true, action: 'deploy' };
+    return { ok: true, action: zeroDowntime ? 'deploy-zd' : 'deploy' };
   }
 
   async destroyAction(job: Job<DeployJobPayload>) {

@@ -23,8 +23,10 @@ import type { DeployMeta } from '../deploy/deploy-meta';
 import type { DeployJobPayload } from '../deploy/deploy.processor';
 import { formatDeployError } from '../deploy/format-deploy-error';
 import {
+  runCoreAbortZeroDowntime,
   runCoreDeployScript,
   runCorePauseScript,
+  runCorePromoteZeroDowntime,
   runCoreResumeScript,
   runCoreSleepScript,
   type DeployAppEnvInput,
@@ -44,6 +46,10 @@ import {
 import { ClickupNotificationsService } from '../notifications/clickup-notifications.service';
 import { extractClickupTaskId } from '../notifications/clickup-task.util';
 import type { PreviewStatus } from './preview-status';
+import {
+  effectiveZeroDowntime,
+  projectHasHealthCheck,
+} from './zero-downtime.util';
 import {
   computeActiveExpiresAt,
   computeExistenceExpiresAt,
@@ -131,6 +137,16 @@ export type InstanceListItem = {
   clickupManualLink: boolean;
   /** Token ClickUp configurado em Settings (mesma flag em todas as linhas). */
   clickupConfigured: boolean;
+  /** Per-instance ZD flag (ignored when project forces ZD). */
+  zeroDowntimeEnabled: boolean;
+  /** Project forces ZD on all branches. */
+  projectZeroDowntimeEnabled: boolean;
+  /** Effective ZD for this row (project || instance). */
+  zeroDowntimeEffective: boolean;
+  /** Staging build/cutover in progress. */
+  zeroDowntimeInProgress: boolean;
+  /** Project has a health check path (required to enable ZD). */
+  projectHealthCheckConfigured: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -292,12 +308,13 @@ export class PreviewInstancesService {
   /**
    * Reserva atômica de slot (advisory lock) antes do shell de deploy.
    * Conta active+deploying. Mesma branch já active/deploying reusa o slot.
+   * Zero-downtime redeploy de branch active → 'run-zd' (sem mudar status / sem slot extra).
    * Sem vaga → status waiting e retorna 'queued'.
    */
   async reserveDeployOrQueue(
     projectSlug: string,
     branch: string,
-  ): Promise<'queued' | 'run'> {
+  ): Promise<'queued' | 'run' | 'run-zd'> {
     const max = await this.settings.getMaxActiveInstances();
     const branchSlug = sanitizeBranchSlug(branch);
     const pm2Name = pm2AppName(projectSlug, branch);
@@ -315,6 +332,22 @@ export class PreviewInstancesService {
         where: { projectId: project.id, branch },
       });
 
+      // ZD redeploy: keep active, mark in-progress, skip slot / deploying transition.
+      if (
+        row?.status === 'active' &&
+        effectiveZeroDowntime(project, row) &&
+        projectHasHealthCheck(project)
+      ) {
+        row.branchSlug = branchSlug;
+        row.zeroDowntimeInProgress = true;
+        row.lastDeployError = null;
+        await repo.save(row);
+        this.log.log(
+          `Zero-downtime redeploy ${projectSlug}/${branch} — staging build (slot reused)`,
+        );
+        return 'run-zd';
+      }
+
       const occupiesSlot =
         !!row && (row.status === 'active' || row.status === 'deploying');
       const occupied = await repo.count({
@@ -331,6 +364,8 @@ export class PreviewInstancesService {
             port: null,
             status: 'waiting',
             idleSleep: false,
+            zeroDowntimeEnabled: false,
+            zeroDowntimeInProgress: false,
           });
           await repo.save(row);
           await eventsRepo.save(
@@ -350,6 +385,7 @@ export class PreviewInstancesService {
           row.branchSlug = branchSlug;
           row.pm2Name = pm2Name;
           row.status = 'waiting';
+          row.zeroDowntimeInProgress = false;
           await repo.save(row);
           await eventsRepo.save(
             eventsRepo.create({
@@ -384,6 +420,8 @@ export class PreviewInstancesService {
           status: 'deploying',
           lastDeployError: null,
           idleSleep: false,
+          zeroDowntimeEnabled: false,
+          zeroDowntimeInProgress: false,
         });
         await repo.save(row);
         await eventsRepo.save(
@@ -404,6 +442,7 @@ export class PreviewInstancesService {
         row.pm2Name = pm2Name;
         row.lastDeployError = null;
         row.idleSleep = false;
+        row.zeroDowntimeInProgress = false;
         if (prev !== 'deploying') {
           row.status = 'deploying';
           await repo.save(row);
@@ -508,9 +547,15 @@ export class PreviewInstancesService {
   /**
    * Após deploy/resume: persiste metadados, aguarda health check (se configurado)
    * e só então marca active. Em timeout, pausa runtime e marca error com logs.
+   * Zero-downtime: HC na porta staging antes do cutover; falha mantém active + versão antiga.
    */
   async awaitHealthCheckAndFinalize(meta: DeployMeta): Promise<PreviewInstance> {
     const project = await this.projects.getBySlug(meta.projectSlug);
+
+    if (meta.zeroDowntime) {
+      return this.awaitZeroDowntimeHealthCheckAndFinalize(project, meta);
+    }
+
     const row = await this.persistDeployMeta(meta);
     const healthPath = normalizeHealthCheckPath(project.healthCheckPath);
 
@@ -553,6 +598,150 @@ export class PreviewInstancesService {
     throw new Error(
       `Health check timeout após ${timeoutMinutes} min (${lastProbe})`,
     );
+  }
+
+  private async awaitZeroDowntimeHealthCheckAndFinalize(
+    project: { slug: string; healthCheckPath: string | null; healthCheckStatus: number | null; healthCheckTimeoutMinutes: number | null; serverUrl: string | null },
+    meta: DeployMeta,
+  ): Promise<PreviewInstance> {
+    const row = await this.repo.findOne({
+      where: { projectId: (await this.projects.getBySlug(meta.projectSlug)).id, branch: meta.branch },
+      relations: ['project'],
+    });
+    if (!row) {
+      throw new Error('Instância não encontrada para zero-downtime finalize');
+    }
+
+    const healthPath = normalizeHealthCheckPath(project.healthCheckPath);
+    if (!healthPath) {
+      await this.finalizeZeroDowntimeFailure(
+        meta,
+        'Zero-downtime requires a health check path on the project.',
+      );
+      throw new Error('Zero-downtime requires a health check path');
+    }
+
+    const expectedStatus = resolveExpectedHealthStatus(project.healthCheckStatus);
+    const timeoutMinutes = resolveHealthCheckTimeoutMinutes(
+      project.healthCheckTimeoutMinutes,
+    );
+    const url = buildHealthCheckUrl(project, meta, healthPath);
+    const deadline = Date.now() + timeoutMinutes * 60_000;
+    let lastProbe = 'sem resposta';
+
+    this.log.log(
+      `ZD health check ${meta.projectSlug}/${meta.branch} → ${url} (HTTP ${expectedStatus}, ${timeoutMinutes} min)`,
+    );
+
+    while (Date.now() < deadline) {
+      const probe = await probeHealthCheckUrl(url, expectedStatus);
+      if (probe.ok) {
+        try {
+          await runCorePromoteZeroDowntime(
+            this.config,
+            meta.projectSlug,
+            meta.branch,
+            meta,
+          );
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          await this.finalizeZeroDowntimeFailure(
+            meta,
+            `Zero-downtime cutover failed after health check OK: ${msg}`,
+          );
+          throw e;
+        }
+        row.pm2Name = meta.stagingPm2Name || meta.pm2Name;
+        row.port = meta.port;
+        row.runner = meta.runner ?? row.runner ?? 'pm2';
+        row.branchSlug = meta.branchSlug;
+        row.lastDeployError = null;
+        row.zeroDowntimeInProgress = false;
+        row.idleSleep = false;
+        await this.repo.save(row);
+        if (row.status !== 'active') {
+          await this.setStatus(row, 'active');
+        }
+        this.log.log(
+          `ZD promote OK ${meta.projectSlug}/${meta.branch} → ${row.pm2Name}:${row.port}`,
+        );
+        return (await this.repo.findOne({ where: { id: row.id } })) as PreviewInstance;
+      }
+      lastProbe = probe.error ?? `HTTP ${probe.statusCode ?? '?'}`;
+      await sleep(HEALTH_CHECK_POLL_INTERVAL_MS);
+    }
+
+    const message =
+      `Zero-downtime deploy failed: health check did not return HTTP ${expectedStatus} within ${timeoutMinutes} min.\n` +
+      `The previous version is still serving traffic.\n` +
+      `URL: ${url}\n` +
+      `Last attempt: ${lastProbe}`;
+    await this.finalizeZeroDowntimeFailure(meta, message);
+    throw new Error(`Zero-downtime health check timeout após ${timeoutMinutes} min (${lastProbe})`);
+  }
+
+  async finalizeZeroDowntimeFailure(
+    meta: DeployMeta,
+    message: string,
+  ): Promise<void> {
+    const project = await this.projects.getBySlug(meta.projectSlug);
+    const row = await this.repo.findOne({
+      where: { projectId: project.id, branch: meta.branch },
+    });
+    if (!row) return;
+
+    const stagingName = meta.stagingPm2Name || meta.pm2Name;
+    const runner = (meta.runner ?? row.runner ?? 'pm2') as 'pm2' | 'docker';
+    const logs = stagingName
+      ? await captureRuntimeLogs(stagingName, runner)
+      : '(runtime sem nome)';
+
+    try {
+      await runCoreAbortZeroDowntime(this.config, meta.projectSlug, meta.branch, meta);
+    } catch (e) {
+      const abortErr = e instanceof Error ? e.message : String(e);
+      this.log.warn(
+        `Abort ZD staging failed (${meta.projectSlug}/${meta.branch}): ${abortErr}`,
+      );
+    }
+
+    row.lastDeployError = appendRuntimeLogsToError(message, logs);
+    row.zeroDowntimeInProgress = false;
+    await this.repo.save(row);
+    // Keep status active — previous version still serving.
+    this.discordNotifications.notifyStatusChangeSafe({
+      instanceId: row.id,
+      oldStatus: 'active',
+      newStatus: 'error',
+    });
+  }
+
+  async updateZeroDowntimeEnabled(
+    id: string,
+    enabled: boolean,
+  ): Promise<InstanceListItem> {
+    const row = await this.repo.findOne({
+      where: { id },
+      relations: ['project'],
+    });
+    if (!row?.project) {
+      throw new NotFoundException(`Instância "${id}" não encontrada`);
+    }
+    if (row.project.zeroDowntimeEnabled) {
+      throw new BadRequestException(
+        'Zero-downtime is forced by the project and cannot be changed per instance.',
+      );
+    }
+    if (enabled && !projectHasHealthCheck(row.project)) {
+      throw new BadRequestException(
+        'Zero-downtime requires a health check path on the project.',
+      );
+    }
+    row.zeroDowntimeEnabled = enabled;
+    await this.repo.save(row);
+    const maps = await this.fetchRuntimeMaps();
+    const fresh = await this.repo.findOne({ where: { id }, relations: ['project'] });
+    return this.buildListItem(fresh as PreviewInstance, maps);
   }
 
   async finalizeDeploySuccess(meta: DeployMeta): Promise<PreviewInstance> {
@@ -609,11 +798,28 @@ export class PreviewInstancesService {
       const row = await this.repo.findOne({
         where: { projectId: project.id, branch },
       });
-      if (row) {
-        row.lastDeployError = deployError;
+      if (!row) return;
+
+      // Shell failed during ZD staging — keep previous version active.
+      if (row.zeroDowntimeInProgress && row.status === 'active') {
+        const message =
+          `Zero-downtime deploy failed while building the new version.\n` +
+          `The previous version is still serving traffic.\n\n${deployError}`;
+        row.lastDeployError = message;
+        row.zeroDowntimeInProgress = false;
         await this.repo.save(row);
-        await this.setStatus(row, 'error');
+        this.discordNotifications.notifyStatusChangeSafe({
+          instanceId: row.id,
+          oldStatus: 'active',
+          newStatus: 'error',
+        });
+        return;
       }
+
+      row.lastDeployError = deployError;
+      row.zeroDowntimeInProgress = false;
+      await this.repo.save(row);
+      await this.setStatus(row, 'error');
     } catch {
       /* ignore */
     }
@@ -799,6 +1005,16 @@ export class PreviewInstancesService {
       clickupTaskStatus: r.clickupTaskStatus ?? null,
       clickupManualLink: !!r.clickupManualLink,
       clickupConfigured: maps.clickupConfigured,
+      zeroDowntimeEnabled: !!r.zeroDowntimeEnabled,
+      projectZeroDowntimeEnabled: !!r.project?.zeroDowntimeEnabled,
+      zeroDowntimeEffective: effectiveZeroDowntime(
+        { zeroDowntimeEnabled: !!r.project?.zeroDowntimeEnabled },
+        r,
+      ),
+      zeroDowntimeInProgress: !!r.zeroDowntimeInProgress,
+      projectHealthCheckConfigured: projectHasHealthCheck(
+        r.project ?? { healthCheckPath: null },
+      ),
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
     };

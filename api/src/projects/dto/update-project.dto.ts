@@ -175,4 +175,13 @@ export class UpdateProjectDto {
   @IsOptional()
   @IsBoolean()
   clickupCommentsEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'Zero-downtime redeploys for every branch. Requires healthCheckPath. Instances cannot opt out while this is on.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  zeroDowntimeEnabled?: boolean;
 }

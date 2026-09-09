@@ -17,22 +17,17 @@ usage() {
 PROJECT_SLUG="$1"
 BRANCH="$2"
 BRANCH_SLUG="$(sanitize_branch_slug "$BRANCH")"
-NAME="$(instance_name "$PROJECT_SLUG" "$BRANCH")"
+BASE_NAME="$(instance_name "$PROJECT_SLUG" "$BRANCH")"
 LOCATIONS_DIR="${PREVIA_LOCATIONS_DIR}"
-LOC_FILE="${LOCATIONS_DIR}/$(location_file_basename "$PROJECT_SLUG" "$BRANCH_SLUG")"
 LEGACY_LOC_FILE="${LOCATIONS_DIR}/${BRANCH_SLUG}.location"
 
-runner="$(read_instance_runner "$NAME")"
-if [[ "$runner" == "docker" ]]; then
-  docker stop "$NAME" 2>/dev/null || true
-  docker rm "$NAME" 2>/dev/null || true
-else
-  pm2_delete_by_instance_name "$NAME"
-fi
+stop_both_instance_colors "$BASE_NAME"
 
-# Mantém ${NAME}.port: a porta continua reservada enquanto a instância existir
+# Mantém *.port: a porta continua reservada enquanto a instância existir
 # (evita que outro deploy pegue a porta durante o idle sleep).
-rm -f "${PREVIA_STATE_DIR}/${NAME}.deploy-result.json"
+rm -f "${PREVIA_STATE_DIR}/${BASE_NAME}.deploy-result.json"
+rm -f "${PREVIA_STATE_DIR}/$(zd_runtime_name "$BASE_NAME" primary).deploy-result.json"
+rm -f "${PREVIA_STATE_DIR}/$(zd_runtime_name "$BASE_NAME" next).deploy-result.json"
 rm -f "$LEGACY_LOC_FILE"
 
 write_wake_location_file "$LOCATIONS_DIR" "$PROJECT_SLUG" "$BRANCH_SLUG" "${PREVIA_WAKE_UPSTREAM}"

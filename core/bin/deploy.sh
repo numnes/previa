@@ -5,6 +5,7 @@
 # Env opcional:
 #   PREVIA_IMAGE=<registry/image:tag> (modo docker remoto)
 #   PREVIA_APP_ENV_FILE=<path> (.env do dashboard: projeto + override da instância)
+#   PREVIA_ZERO_DOWNTIME=1  (staging build; não troca nginx até promote-zd.sh)
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/common.sh
@@ -21,9 +22,14 @@ log() {
 }
 
 RESUME_ONLY=0
+ZERO_DOWNTIME=0
+if [[ "${PREVIA_ZERO_DOWNTIME:-}" == "1" ]]; then
+  ZERO_DOWNTIME=1
+fi
 GIT_URL=""
 if [[ "${1:-}" == "--resume" ]]; then
   RESUME_ONLY=1
+  ZERO_DOWNTIME=0
   shift
   [[ $# -ge 2 ]] || usage
   PROJECT_SLUG="$1"
@@ -37,9 +43,31 @@ fi
 BRANCH_SLUG="$(sanitize_branch_slug "$BRANCH")"
 LOCATION_BASENAME="$(location_file_basename "$PROJECT_SLUG" "$BRANCH_SLUG")"
 
-TARGET_DIR="${PREVIA_WORK_ROOT}/${PROJECT_SLUG}/${BRANCH_SLUG}"
+BASE_NAME="$(instance_name "$PROJECT_SLUG" "$BRANCH")"
+LIVE_COLOR="$(read_live_color "$BASE_NAME")"
+LIVE_NAME="$(zd_runtime_name "$BASE_NAME" "$LIVE_COLOR")"
+STAGING_COLOR=""
+STAGING_NAME=""
+PREVIOUS_PORT=""
+
+if [[ "$ZERO_DOWNTIME" -eq 1 ]]; then
+  STAGING_COLOR="$(zd_opposite_color "$LIVE_COLOR")"
+  STAGING_NAME="$(zd_runtime_name "$BASE_NAME" "$STAGING_COLOR")"
+  NAME="$STAGING_NAME"
+  TARGET_DIR="$(zd_checkout_dir "$PROJECT_SLUG" "$BRANCH_SLUG" "$STAGING_COLOR")"
+  if [[ -f "${PREVIA_STATE_DIR}/${LIVE_NAME}.port" ]]; then
+    PREVIOUS_PORT="$(tr -d '[:space:]' <"${PREVIA_STATE_DIR}/${LIVE_NAME}.port")"
+  elif [[ -f "${PREVIA_STATE_DIR}/${BASE_NAME}.port" ]]; then
+    PREVIOUS_PORT="$(tr -d '[:space:]' <"${PREVIA_STATE_DIR}/${BASE_NAME}.port")"
+  fi
+  log "[deploy] zero-downtime staging color=${STAGING_COLOR} name=${NAME} dir=${TARGET_DIR} (live=${LIVE_NAME})"
+else
+  # Classic / resume: operate on the live color checkout + runtime name.
+  NAME="$LIVE_NAME"
+  TARGET_DIR="$(zd_checkout_dir "$PROJECT_SLUG" "$BRANCH_SLUG" "$LIVE_COLOR")"
+fi
+
 LOCATIONS_DIR="${PREVIA_LOCATIONS_DIR}"
-NAME="$(instance_name "$PROJECT_SLUG" "$BRANCH")"
 MERGED_ENV_FILE=""
 
 cleanup_merged_env() {
@@ -78,7 +106,8 @@ clone_or_update_repo() {
 write_deploy_meta() {
   local runner="$1"
   local port="$2"
-  local result_json="${PREVIA_STATE_DIR}/${NAME}.deploy-result.json"
+  # Always write under BASE_NAME so the API can find the result by canonical name.
+  local result_json="${PREVIA_STATE_DIR}/${BASE_NAME}.deploy-result.json"
   export _D_META_PROJECT="$PROJECT_SLUG"
   export _D_META_BRANCH="$BRANCH"
   export _D_META_BRANCH_SLUG="$BRANCH_SLUG"
@@ -86,6 +115,12 @@ write_deploy_meta() {
   export _D_META_PORT="$port"
   export _D_META_RUNNER="$runner"
   export _D_META_OUT="$result_json"
+  export _D_META_ZD="$ZERO_DOWNTIME"
+  export _D_META_LIVE_NAME="$LIVE_NAME"
+  export _D_META_STAGING_NAME="${STAGING_NAME:-}"
+  export _D_META_PREV_PORT="${PREVIOUS_PORT:-}"
+  export _D_META_LIVE_COLOR="$LIVE_COLOR"
+  export _D_META_STAGING_COLOR="${STAGING_COLOR:-}"
   python3 <<'PY'
 import json, os, sys
 
@@ -97,6 +132,14 @@ out = {
     "port": int(os.environ["_D_META_PORT"]),
     "runner": os.environ["_D_META_RUNNER"],
 }
+if os.environ.get("_D_META_ZD") == "1":
+    out["zeroDowntime"] = True
+    out["livePm2Name"] = os.environ.get("_D_META_LIVE_NAME") or None
+    out["stagingPm2Name"] = os.environ.get("_D_META_STAGING_NAME") or None
+    prev = (os.environ.get("_D_META_PREV_PORT") or "").strip()
+    out["previousPort"] = int(prev) if prev.isdigit() else None
+    out["liveColor"] = os.environ.get("_D_META_LIVE_COLOR") or "primary"
+    out["stagingColor"] = os.environ.get("_D_META_STAGING_COLOR") or "next"
 path = os.environ["_D_META_OUT"]
 with open(path, "w", encoding="utf-8") as f:
     json.dump(out, f)
@@ -223,10 +266,15 @@ deploy_pm2() {
   PORT="$(reserve_free_port "$NAME")"
   export PORT
 
-  # Para o processo ANTES do build: `npm run build` / `rimraf dist` apaga o
-  # target enquanto o PM2 antigo ainda aponta para ele → crash loop MODULE_NOT_FOUND
-  # se o build falhar depois (e stop_instance nunca rodar).
-  stop_instance "$NAME"
+  if [[ "$ZERO_DOWNTIME" -eq 1 ]]; then
+    # Stop leftover staging only; keep live serving traffic.
+    stop_instance "$NAME"
+  else
+    # Para o processo ANTES do build: `npm run build` / `rimraf dist` apaga o
+    # target enquanto o PM2 antigo ainda aponta para ele → crash loop MODULE_NOT_FOUND
+    # se o build falhar depois (e stop_instance nunca rodar).
+    stop_instance "$NAME"
+  fi
   # Se a porta reservada ainda estiver ocupada (órfão / roubo legado), realoca.
   if is_port_listening "$PORT"; then
     log "[deploy] porta ${PORT} ainda em uso após stop — realocando"
@@ -269,10 +317,16 @@ deploy_pm2() {
   # Após a seção de comandos (build) do previa.yaml: aplica envs no start PM2.
   pm2_start_with_env "$abs_target" "$PORT" "$MERGED_ENV_FILE" "$TARGET_DIR"
 
-  write_location_file "$LOCATIONS_DIR" "$PROJECT_SLUG" "$BRANCH_SLUG" "$PORT"
-  nginx_reload
+  if [[ "$ZERO_DOWNTIME" -eq 0 ]]; then
+    write_location_file "$LOCATIONS_DIR" "$PROJECT_SLUG" "$BRANCH_SLUG" "$PORT"
+    nginx_reload
+    write_live_color "$BASE_NAME" "$LIVE_COLOR"
+    echo "$PORT" >"${PREVIA_STATE_DIR}/${BASE_NAME}.port"
+  fi
   write_deploy_meta "pm2" "$PORT"
-  if [[ "$RESUME_ONLY" -eq 1 ]]; then
+  if [[ "$ZERO_DOWNTIME" -eq 1 ]]; then
+    log "OK zero-downtime staging ${PROJECT_SLUG} branch ${BRANCH} -> porta ${PORT} pm2:${NAME} (nginx unchanged)"
+  elif [[ "$RESUME_ONLY" -eq 1 ]]; then
     log "OK resume ${PROJECT_SLUG} branch ${BRANCH} -> porta ${PORT} pm2:${NAME}"
   else
     log "OK deploy ${PROJECT_SLUG} branch ${BRANCH} -> porta ${PORT} pm2:${NAME}"
@@ -337,10 +391,18 @@ deploy_docker() {
     "${docker_env_args[@]}" \
     "$image_to_run" >/dev/null
 
-  write_location_file "$LOCATIONS_DIR" "$PROJECT_SLUG" "$BRANCH_SLUG" "$host_port"
-  nginx_reload
+  if [[ "$ZERO_DOWNTIME" -eq 0 ]]; then
+    write_location_file "$LOCATIONS_DIR" "$PROJECT_SLUG" "$BRANCH_SLUG" "$host_port"
+    nginx_reload
+    write_live_color "$BASE_NAME" "$LIVE_COLOR"
+    echo "$host_port" >"${PREVIA_STATE_DIR}/${BASE_NAME}.port"
+  fi
   write_deploy_meta "docker" "$host_port"
-  log "OK deploy ${PROJECT_SLUG} branch ${BRANCH} -> porta ${host_port} docker:${NAME}"
+  if [[ "$ZERO_DOWNTIME" -eq 1 ]]; then
+    log "OK zero-downtime staging ${PROJECT_SLUG} branch ${BRANCH} -> porta ${host_port} docker:${NAME} (nginx unchanged)"
+  else
+    log "OK deploy ${PROJECT_SLUG} branch ${BRANCH} -> porta ${host_port} docker:${NAME}"
+  fi
 }
 
 # Sempre clona/atualiza para ler previa.yaml (e para build local), exceto no wake.
