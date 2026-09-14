@@ -87,6 +87,13 @@ export class PreviewInstance {
   clickupManualLink: boolean;
 
   /**
+   * IDs de tarefas ClickUp relacionadas (linked + dependencies), para busca.
+   * Inclui custom ids (PROJ-123) e ids nativos quando conhecidos.
+   */
+  @Column({ name: 'clickup_related_task_ids', type: 'jsonb', default: () => "'[]'" })
+  clickupRelatedTaskIds: string[];
+
+  /**
    * Override de env por instância (sobrescreve as do projeto no merge do deploy).
    * Objeto vazio = sem override.
    */

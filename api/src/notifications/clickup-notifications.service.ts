@@ -12,13 +12,16 @@ import { buildPreviewUrl } from './discord-message.util';
 import {
   DEFAULT_CLICKUP_COMMENT_TEMPLATE,
   extractClickupTaskId,
+  extractRelatedNativeTaskIds,
   isClickupCustomTaskId,
+  mergeClickupSearchIds,
   normalizeClickupTaskId,
   parseClickupTaskRef,
   renderClickupCommentTemplate,
 } from './clickup-task.util';
 
 const CLICKUP_API = 'https://api.clickup.com/api/v2';
+const MAX_RELATED_TASK_RESOLVES = 20;
 
 export type ClickupTaskSnapshot = {
   id: string;
@@ -26,6 +29,8 @@ export type ClickupTaskSnapshot = {
   name: string | null;
   status: string | null;
   url: string | null;
+  /** Searchable related ids (custom + native), excluding the primary task. */
+  relatedTaskIds: string[];
 };
 
 @Injectable()
@@ -86,9 +91,7 @@ export class ClickupNotificationsService {
     const snapshot = await this.fetchTask(token, taskId, teamId);
     await this.createComment(token, snapshot.id, undefined, commentText);
 
-    row.clickupTaskId = snapshot.customId || snapshot.id;
-    row.clickupTaskUrl = snapshot.url;
-    row.clickupTaskStatus = snapshot.status;
+    this.applyTaskSnapshot(row, snapshot);
     row.clickupCommentedAt = new Date();
     await this.instances.save(row);
     this.log.log(`ClickUp comment posted on ${taskId} for ${row.project.slug}/${row.branch}`);
@@ -115,6 +118,7 @@ export class ClickupNotificationsService {
       row.clickupTaskId = null;
       row.clickupTaskUrl = null;
       row.clickupTaskStatus = null;
+      row.clickupRelatedTaskIds = [];
       row.clickupManualLink = false;
       return this.instances.save(row);
     }
@@ -135,11 +139,9 @@ export class ClickupNotificationsService {
     const teamId = (await this.settings.getValue(CLICKUP_TEAM_ID_KEY))?.trim();
     const snapshot = await this.fetchTask(token, taskRef, teamId);
 
-    row.clickupTaskId = snapshot.customId || snapshot.id;
-    row.clickupTaskUrl =
-      snapshot.url ||
-      (trimmed.startsWith('http') ? trimmed.split('?')[0] : null);
-    row.clickupTaskStatus = snapshot.status;
+    this.applyTaskSnapshot(row, snapshot, {
+      urlFallback: trimmed.startsWith('http') ? trimmed.split('?')[0] : null,
+    });
     row.clickupManualLink = true;
     return this.instances.save(row);
   }
@@ -173,9 +175,7 @@ export class ClickupNotificationsService {
     const teamId = (await this.settings.getValue(CLICKUP_TEAM_ID_KEY))?.trim();
     const snapshot = await this.fetchTask(token, taskRef, teamId);
 
-    row.clickupTaskId = snapshot.customId || snapshot.id;
-    row.clickupTaskUrl = snapshot.url;
-    row.clickupTaskStatus = snapshot.status;
+    this.applyTaskSnapshot(row, snapshot);
     row.clickupManualLink = false;
     return this.instances.save(row);
   }
@@ -199,15 +199,24 @@ export class ClickupNotificationsService {
     try {
       const teamId = (await this.settings.getValue(CLICKUP_TEAM_ID_KEY))?.trim();
       const snapshot = await this.fetchTask(token, taskRef, teamId);
-      row.clickupTaskId = snapshot.customId || snapshot.id;
-      if (snapshot.url) row.clickupTaskUrl = snapshot.url;
-      row.clickupTaskStatus = snapshot.status;
+      this.applyTaskSnapshot(row, snapshot);
       return this.instances.save(row);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       this.log.debug(`ClickUp refresh failed (${instanceId}): ${msg}`);
       return row;
     }
+  }
+
+  private applyTaskSnapshot(
+    row: PreviewInstance,
+    snapshot: ClickupTaskSnapshot,
+    opts?: { urlFallback?: string | null },
+  ): void {
+    row.clickupTaskId = snapshot.customId || snapshot.id;
+    row.clickupTaskUrl = snapshot.url || opts?.urlFallback || row.clickupTaskUrl;
+    row.clickupTaskStatus = snapshot.status;
+    row.clickupRelatedTaskIds = snapshot.relatedTaskIds;
   }
 
   private clickupHeaders(token: string): Record<string, string> {
@@ -250,9 +259,11 @@ export class ClickupNotificationsService {
       name?: string;
       url?: string;
       status?: { status?: string } | string | null;
+      linked_tasks?: Array<{ task_id?: string; link_id?: string }> | null;
+      dependencies?: Array<{ task_id?: string; depends_on?: string }> | null;
     },
     fallbackId: string,
-  ): ClickupTaskSnapshot {
+  ): ClickupTaskSnapshot & { relatedNativeIds: string[] } {
     const statusRaw = json.status;
     const status =
       typeof statusRaw === 'string'
@@ -260,12 +271,15 @@ export class ClickupNotificationsService {
         : statusRaw && typeof statusRaw === 'object'
           ? statusRaw.status ?? null
           : null;
+    const id = json.id || fallbackId;
     return {
-      id: json.id || fallbackId,
+      id,
       customId: json.custom_id ?? null,
       name: json.name ?? null,
       status,
       url: json.url ?? null,
+      relatedTaskIds: [],
+      relatedNativeIds: extractRelatedNativeTaskIds(json, id),
     };
   }
 
@@ -273,7 +287,13 @@ export class ClickupNotificationsService {
     token: string,
     taskId: string,
     teamId: string | undefined,
-  ): Promise<{ ok: true; snapshot: ClickupTaskSnapshot } | { ok: false; status: number; body: string }> {
+  ): Promise<
+    | {
+        ok: true;
+        snapshot: ClickupTaskSnapshot & { relatedNativeIds: string[] };
+      }
+    | { ok: false; status: number; body: string }
+  > {
     const custom = isClickupCustomTaskId(taskId);
     const query = custom && teamId ? this.customIdQuery(teamId) : '';
     const url = `${CLICKUP_API}/task/${encodeURIComponent(taskId)}${query}`;
@@ -288,23 +308,83 @@ export class ClickupNotificationsService {
       name?: string;
       url?: string;
       status?: { status?: string } | string | null;
+      linked_tasks?: Array<{ task_id?: string; link_id?: string }> | null;
+      dependencies?: Array<{ task_id?: string; depends_on?: string }> | null;
     };
     return { ok: true, snapshot: this.parseTaskJson(json, taskId) };
+  }
+
+  /**
+   * Resolve native related ids into searchable custom + native ids.
+   * Failures for individual related tasks are ignored.
+   */
+  private async resolveRelatedSearchIds(
+    token: string,
+    primary: ClickupTaskSnapshot & { relatedNativeIds: string[] },
+  ): Promise<string[]> {
+    const nativeIds = primary.relatedNativeIds.slice(0, MAX_RELATED_TASK_RESOLVES);
+    if (!nativeIds.length) return [];
+
+    const relatedLabels: string[] = [];
+    const concurrency = 5;
+    for (let i = 0; i < nativeIds.length; i += concurrency) {
+      const batch = nativeIds.slice(i, i + concurrency);
+      const results = await Promise.all(
+        batch.map(async (id) => {
+          const result = await this.fetchTaskOnce(token, id, undefined);
+          if (!result.ok) {
+            return [id];
+          }
+          return mergeClickupSearchIds([
+            result.snapshot.customId ?? '',
+            result.snapshot.id,
+          ]);
+        }),
+      );
+      for (const labels of results) relatedLabels.push(...labels);
+    }
+
+    const primaryKeys = new Set(
+      mergeClickupSearchIds([primary.customId ?? '', primary.id]).map((v) =>
+        v.toLowerCase(),
+      ),
+    );
+    return mergeClickupSearchIds(relatedLabels).filter(
+      (id) => !primaryKeys.has(id.toLowerCase()),
+    );
   }
 
   async fetchTask(
     token: string,
     taskId: string,
     teamId: string | undefined,
+    options?: { includeRelated?: boolean },
   ): Promise<ClickupTaskSnapshot> {
+    const includeRelated = options?.includeRelated !== false;
     const normalizedId = isClickupCustomTaskId(taskId)
       ? normalizeClickupTaskId(taskId)
       : taskId.trim();
     const custom = isClickupCustomTaskId(normalizedId);
 
+    const withRelated = async (
+      snapshot: ClickupTaskSnapshot & { relatedNativeIds: string[] },
+    ): Promise<ClickupTaskSnapshot> => {
+      const relatedTaskIds = includeRelated
+        ? await this.resolveRelatedSearchIds(token, snapshot)
+        : [];
+      return {
+        id: snapshot.id,
+        customId: snapshot.customId,
+        name: snapshot.name,
+        status: snapshot.status,
+        url: snapshot.url,
+        relatedTaskIds,
+      };
+    };
+
     if (!custom) {
       const result = await this.fetchTaskOnce(token, normalizedId, undefined);
-      if (result.ok) return result.snapshot;
+      if (result.ok) return withRelated(result.snapshot);
       throw this.clickupFetchError(normalizedId, result.status, result.body, false);
     }
 
@@ -336,7 +416,7 @@ export class ClickupNotificationsService {
 
     for (const candidate of teamIds) {
       const hit = await tryTeam(candidate);
-      if (hit) return hit;
+      if (hit) return withRelated(hit);
     }
 
     // Wrong workspace id often returns 401/OAUTH_027 or 404 — retry with teams the token can access.
@@ -349,7 +429,7 @@ export class ClickupNotificationsService {
             `ClickUp custom id ${normalizedId}: configured team ${configured} failed; succeeded with team ${alt}`,
           );
         }
-        return hit;
+        return withRelated(hit);
       }
     }
 

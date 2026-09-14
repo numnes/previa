@@ -242,7 +242,9 @@ export class AmplifyService {
 
     const results = await mapPool(targets, CLICKUP_CONCURRENCY, async (t) => {
       try {
-        const snapshot = await this.clickup.fetchTask(token, t.taskId, teamId);
+        const snapshot = await this.clickup.fetchTask(token, t.taskId, teamId, {
+          includeRelated: false,
+        });
         return {
           branchName: t.branchName,
           clickupTaskId: snapshot.customId || snapshot.id,

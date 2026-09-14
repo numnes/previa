@@ -830,6 +830,18 @@ export default function InstanceDetailClient() {
                               automatically when ClickUp is configured.
                             </p>
                           )}
+                          {(row.clickupRelatedTaskIds?.length ?? 0) > 0 ? (
+                            <p className="text-xs text-white/55">
+                              Related:{' '}
+                              <span className="font-mono text-white/75">
+                                {row.clickupRelatedTaskIds!.join(', ')}
+                              </span>
+                              <span className="text-white/40">
+                                {' '}
+                                (searchable on the Instances list)
+                              </span>
+                            </p>
+                          ) : null}
                           {row.isLocal && admin ? (
                             <div className="mt-2 max-w-xl space-y-2">
                               <label className="block text-xs text-white/55">

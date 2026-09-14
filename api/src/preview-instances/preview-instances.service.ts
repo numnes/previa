@@ -135,6 +135,8 @@ export type InstanceListItem = {
   clickupTaskStatus: string | null;
   /** true = vínculo manual; não comenta automaticamente. */
   clickupManualLink: boolean;
+  /** Related ClickUp task ids (linked + dependencies) for search. */
+  clickupRelatedTaskIds: string[];
   /** Token ClickUp configurado em Settings (mesma flag em todas as linhas). */
   clickupConfigured: boolean;
   /** Per-instance ZD flag (ignored when project forces ZD). */
@@ -1004,6 +1006,9 @@ export class PreviewInstancesService {
       clickupTaskUrl: r.clickupTaskUrl ?? null,
       clickupTaskStatus: r.clickupTaskStatus ?? null,
       clickupManualLink: !!r.clickupManualLink,
+      clickupRelatedTaskIds: Array.isArray(r.clickupRelatedTaskIds)
+        ? r.clickupRelatedTaskIds.filter((id): id is string => typeof id === 'string')
+        : [],
       clickupConfigured: maps.clickupConfigured,
       zeroDowntimeEnabled: !!r.zeroDowntimeEnabled,
       projectZeroDowntimeEnabled: !!r.project?.zeroDowntimeEnabled,

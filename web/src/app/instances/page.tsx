@@ -101,7 +101,9 @@ function InstancesPageContent() {
     return instances.filter((i) => {
       if (statusFilter && i.status !== statusFilter) return false;
       if (!q) return true;
-      const hay = `${i.projectSlug} ${i.branch}`.toLowerCase();
+      const related = (i.clickupRelatedTaskIds ?? []).join(' ');
+      const hay =
+        `${i.projectSlug} ${i.branch} ${i.clickupTaskId ?? ''} ${related} ${i.clickupTaskStatus ?? ''}`.toLowerCase();
       return hay.includes(q);
     });
   }, [instances, search, statusFilter]);
@@ -132,13 +134,13 @@ function InstancesPageContent() {
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="flex-1">
               <label className="mb-1.5 block text-sm text-[#b8bcc4]" htmlFor="instance-search">
-                Project or branch
+                Project, branch, or ClickUp
               </label>
               <input
                 id="instance-search"
                 className="input w-full"
                 type="search"
-                placeholder="Search by project or branch…"
+                placeholder="Search by project, branch, or ClickUp task id…"
                 value={search}
                 onChange={(e) => {
                   const next = e.target.value;

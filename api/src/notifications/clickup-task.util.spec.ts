@@ -1,6 +1,8 @@
 import {
   extractClickupTaskId,
+  extractRelatedNativeTaskIds,
   maskClickupToken,
+  mergeClickupSearchIds,
   parseClickupTaskRef,
   renderClickupCommentTemplate,
 } from './clickup-task.util';
@@ -29,6 +31,30 @@ describe('clickup-task.util', () => {
     expect(parseClickupTaskRef('PROJ-4491')).toBe('PROJ-4491');
     expect(parseClickupTaskRef('proj-4491')).toBe('PROJ-4491');
     expect(parseClickupTaskRef('not a task')).toBeNull();
+  });
+
+  it('extracts related native ids from linked_tasks and dependencies', () => {
+    expect(
+      extractRelatedNativeTaskIds(
+        {
+          id: 'aaa',
+          linked_tasks: [
+            { task_id: 'aaa', link_id: 'bbb' },
+            { task_id: 'ccc', link_id: 'aaa' },
+          ],
+          dependencies: [{ task_id: 'aaa', depends_on: 'ddd' }],
+        },
+        'aaa',
+      ),
+    ).toEqual(['bbb', 'ccc', 'ddd']);
+  });
+
+  it('merges searchable ClickUp ids without duplicates', () => {
+    expect(mergeClickupSearchIds(['proj-1', 'abc'], ['PROJ-1', 'def', ''])).toEqual([
+      'PROJ-1',
+      'abc',
+      'def',
+    ]);
   });
 
   it('renders comment placeholders', () => {

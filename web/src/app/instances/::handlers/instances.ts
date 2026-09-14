@@ -41,6 +41,8 @@ export type InstanceRow = {
   clickupTaskUrl?: string | null;
   clickupTaskStatus?: string | null;
   clickupManualLink?: boolean;
+  /** Related ClickUp task ids (linked + dependencies) for search. */
+  clickupRelatedTaskIds?: string[];
   /** Token ClickUp configured in Settings (same on every row). */
   clickupConfigured?: boolean;
   zeroDowntimeEnabled?: boolean;

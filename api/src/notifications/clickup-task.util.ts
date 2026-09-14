@@ -94,3 +94,68 @@ export function maskClickupToken(token: string | null | undefined): {
     clickupApiTokenLast4: trimmed.slice(-4),
   };
 }
+
+export type ClickupLinkedTaskRef = {
+  task_id?: string;
+  link_id?: string;
+};
+
+export type ClickupDependencyRef = {
+  task_id?: string;
+  depends_on?: string;
+};
+
+/**
+ * Collect related native task ids from GET /task payload (linked_tasks + dependencies),
+ * excluding the primary task itself.
+ */
+export function extractRelatedNativeTaskIds(
+  payload: {
+    id?: string;
+    linked_tasks?: ClickupLinkedTaskRef[] | null;
+    dependencies?: ClickupDependencyRef[] | null;
+  },
+  selfId?: string | null,
+): string[] {
+  const self = new Set(
+    [selfId, payload.id]
+      .map((v) => (typeof v === 'string' ? v.trim() : ''))
+      .filter(Boolean),
+  );
+  const ids = new Set<string>();
+  const add = (raw: string | undefined) => {
+    const id = raw?.trim();
+    if (!id || self.has(id)) return;
+    ids.add(id);
+  };
+
+  for (const link of payload.linked_tasks ?? []) {
+    add(link.task_id);
+    add(link.link_id);
+  }
+  for (const dep of payload.dependencies ?? []) {
+    add(dep.task_id);
+    add(dep.depends_on);
+  }
+
+  return [...ids];
+}
+
+/** Deduplicate searchable ClickUp ids (custom + native), preserving order. */
+export function mergeClickupSearchIds(...groups: Array<string[] | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const group of groups) {
+    for (const raw of group ?? []) {
+      const id = raw?.trim();
+      if (!id) continue;
+      const key = isClickupCustomTaskId(id)
+        ? normalizeClickupTaskId(id).toLowerCase()
+        : id.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(isClickupCustomTaskId(id) ? normalizeClickupTaskId(id) : id);
+    }
+  }
+  return out;
+}
