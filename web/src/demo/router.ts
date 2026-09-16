@@ -303,6 +303,7 @@ async function handleInstances(
     });
   }
   if (method === 'POST' && parts.length === 3 && parts[2] === 'remove') {
+    requireAdmin(user);
     await delay(300);
     const row = s.instances.find((i) => i.id === parts[1]);
     if (!row) throw new DemoHttpError(404, 'Instance not found');
@@ -419,7 +420,7 @@ function handleAmplify(
   method: string,
   parts: string[],
   body: unknown,
-  _user: AuthUser,
+  user: AuthUser,
 ) {
   const s = getDemoStore();
   const hidden = new Set(
@@ -452,6 +453,7 @@ function handleAmplify(
     parts[2] === 'delete' &&
     parts.length === 3
   ) {
+    requireAdmin(user);
     const name = String((body as { branchName?: string })?.branchName ?? '').trim();
     if (!name) throw new DemoHttpError(400, 'Informe o nome da branch.');
     if (hidden.has(name.toLowerCase())) {

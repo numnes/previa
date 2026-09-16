@@ -450,14 +450,16 @@ export default function AmplifyPage() {
                         >
                           {hosting === b.branchName ? 'Redeploying…' : 'Redeploy'}
                         </button>
-                        <button
-                          type="button"
-                          className="btn border-rose-200/30 bg-rose-200/10 text-xs text-rose-100 hover:bg-rose-200/15 disabled:cursor-not-allowed disabled:opacity-50"
-                          disabled={busy}
-                          onClick={() => void onDelete(b.branchName, b.stage)}
-                        >
-                          {deleting === b.branchName ? 'Deleting…' : 'Delete branch'}
-                        </button>
+                        {admin ? (
+                          <button
+                            type="button"
+                            className="btn border-rose-200/30 bg-rose-200/10 text-xs text-rose-100 hover:bg-rose-200/15 disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={busy}
+                            onClick={() => void onDelete(b.branchName, b.stage)}
+                          >
+                            {deleting === b.branchName ? 'Deleting…' : 'Delete branch'}
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

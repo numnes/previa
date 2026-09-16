@@ -622,21 +622,23 @@ export default function InstanceDetailClient() {
                           {statusAction === 'activate' ? 'Working…' : 'Activate / redeploy'}
                         </button>
                       )}
-                      <button
-                        type="button"
-                        className="btn text-sm border-rose-200/30 bg-rose-200/10 text-rose-100 hover:bg-rose-200/15 disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={statusBusy || row.zeroDowntimeInProgress || !row.canWrite}
-                        title={
-                          row.zeroDowntimeInProgress
-                            ? 'Zero-downtime redeploy in progress'
-                            : statusBusy
-                              ? 'Status change in progress'
-                              : undefined
-                        }
-                        onClick={() => void runRemove()}
-                      >
-                        {statusAction === 'remove' ? 'Removing…' : 'Remove'}
-                      </button>
+                      {admin ? (
+                        <button
+                          type="button"
+                          className="btn text-sm border-rose-200/30 bg-rose-200/10 text-rose-100 hover:bg-rose-200/15 disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={statusBusy || row.zeroDowntimeInProgress || !row.canWrite}
+                          title={
+                            row.zeroDowntimeInProgress
+                              ? 'Zero-downtime redeploy in progress'
+                              : statusBusy
+                                ? 'Status change in progress'
+                                : undefined
+                          }
+                          onClick={() => void runRemove()}
+                        >
+                          {statusAction === 'remove' ? 'Removing…' : 'Remove'}
+                        </button>
+                      ) : null}
                     </div>
                     {statusBusy || row.zeroDowntimeInProgress ? (
                       <p className="mt-2 text-sm text-sky-200/80">

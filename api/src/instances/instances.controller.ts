@@ -90,8 +90,9 @@ export class InstancesController {
   }
 
   @ApiBearerAuth('jwt')
-  @ApiOkResponse({ description: 'Remove instância (destroy + remove do banco)' })
-  @UseGuards(JwtAuthGuard)
+  @ApiOkResponse({ description: 'Remove instância (destroy + remove do banco, admin only)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Post(':id/remove')
   remove(@Param('id') id: string) {
     return this.instances.remove(id);
