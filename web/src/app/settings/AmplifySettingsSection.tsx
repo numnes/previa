@@ -72,9 +72,11 @@ export function AmplifySettingsSection() {
       <h2 className="text-sm font-medium text-[#e8eaed]">AWS Amplify</h2>
       <p className="mt-1 text-xs text-[#8b919a]">
         List hosted branches of an Amplify app, hide long-lived ones (e.g.{' '}
-        <span className="font-mono">main</span>), and tear down a branch the same way as{' '}
-        <span className="font-mono">aws amplify delete-branch</span>. ClickUp status uses the same
-        branch → task matching as Previa instances.
+        <span className="font-mono">main</span>), host a git branch from the current HEAD without a
+        push (<span className="font-mono">create-branch</span> /{' '}
+        <span className="font-mono">start-job RELEASE</span>), and tear down a branch the same way
+        as <span className="font-mono">aws amplify delete-branch</span>. ClickUp status uses the
+        same branch → task matching as Previa instances.
       </p>
 
       {error ? <div className="alert-error mt-3">{error}</div> : null}
@@ -180,7 +182,10 @@ export function AmplifySettingsSection() {
         </label>
         <p className="text-xs text-white/55">
           IAM needs <span className="font-mono">amplify:ListBranches</span>,{' '}
-          <span className="font-mono">amplify:GetApp</span>, and{' '}
+          <span className="font-mono">amplify:GetApp</span>,{' '}
+          <span className="font-mono">amplify:GetBranch</span>,{' '}
+          <span className="font-mono">amplify:CreateBranch</span>,{' '}
+          <span className="font-mono">amplify:StartJob</span>, and{' '}
           <span className="font-mono">amplify:DeleteBranch</span>. Leave keys blank to keep the
           current pair, or to use <span className="font-mono">AWS_ACCESS_KEY_ID</span> / instance
           role on the host.

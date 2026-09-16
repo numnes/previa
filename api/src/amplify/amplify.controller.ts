@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AmplifyService } from './amplify.service';
 import { DeleteAmplifyBranchDto } from './dto/delete-amplify-branch.dto';
+import { HostAmplifyBranchDto } from './dto/host-amplify-branch.dto';
 
 @ApiTags('amplify')
 @Controller('amplify')
@@ -17,6 +18,17 @@ export class AmplifyController {
   @Get('branches')
   listBranches() {
     return this.amplify.listBranches();
+  }
+
+  @ApiBearerAuth('jwt')
+  @ApiOkResponse({
+    description:
+      'Hospeda uma branch Git no Amplify (create-branch) ou dispara um RELEASE no HEAD atual (start-job), sem push',
+  })
+  @UseGuards(JwtAuthGuard)
+  @Post('branches/host')
+  hostBranch(@Body() body: HostAmplifyBranchDto) {
+    return this.amplify.hostBranch(body.branchName);
   }
 
   @ApiBearerAuth('jwt')

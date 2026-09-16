@@ -36,6 +36,25 @@ export async function listAmplifyBranches(): Promise<AmplifyBranchesPayload> {
   });
 }
 
+export async function hostAmplifyBranch(
+  branchName: string,
+): Promise<{ ok: true; branchName: string; action: 'created' | 'redeployed'; jobId: string | null }> {
+  const token = getTokenClient();
+  return await httpJson<{
+    ok: true;
+    branchName: string;
+    action: 'created' | 'redeployed';
+    jobId: string | null;
+  }>(`${apiBaseClient()}/amplify/branches/host`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ branchName }),
+  });
+}
+
 export async function deleteAmplifyBranch(branchName: string): Promise<{ ok: true; branchName: string }> {
   const token = getTokenClient();
   return await httpJson<{ ok: true; branchName: string }>(

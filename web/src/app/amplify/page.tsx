@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { AUTO_RELOAD_INTERVAL_MS, ReloadButton } from '@/components/ReloadButton';
 import { RequireAuth } from '@/components/RequireAuth';
 import { ClientTable } from '@/components/ClientTable';
+import { Modal } from '@/components/Modal';
 import { getUserClient, isAdmin } from '@/lib/client-auth';
 import {
   amplifyStageBadgeClass,
@@ -14,6 +15,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   deleteAmplifyBranch,
+  hostAmplifyBranch,
   listAmplifyBranches,
   nestErrorMessage,
   type AmplifyBranchesPayload,
@@ -44,6 +46,11 @@ export default function AmplifyPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [hostName, setHostName] = useState('');
+  const [hostOpen, setHostOpen] = useState(false);
+  const [hosting, setHosting] = useState<string | null>(null);
+  const [hostError, setHostError] = useState<string | null>(null);
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -107,6 +114,67 @@ export default function AmplifyPage() {
     }
   }
 
+  async function onHost(branchName: string, mode: 'form' | 'row') {
+    const name = branchName.trim();
+    if (!name) {
+      if (mode === 'form') setHostError('Enter a git branch name.');
+      else setError('Enter a git branch name.');
+      return;
+    }
+    const alreadyHosted = payload?.branches.some(
+      (b) => b.branchName.toLowerCase() === name.toLowerCase(),
+    );
+    const existing = payload?.branches.find(
+      (b) => b.branchName.toLowerCase() === name.toLowerCase(),
+    );
+    const prodWarn =
+      (existing?.stage ?? '').toUpperCase() === 'PRODUCTION'
+        ? '\n\nThis branch is marked PRODUCTION in Amplify.'
+        : '';
+    const confirmText = alreadyHosted
+      ? `Redeploy Amplify branch "${name}" from the current git HEAD?${prodWarn}\n\nThis runs:\naws amplify start-job --job-type RELEASE\n\nNo git push is required.`
+      : `Host git branch "${name}" on Amplify from the current HEAD?${prodWarn}\n\nThis runs:\naws amplify create-branch --branch-name ${name}\naws amplify start-job --job-type RELEASE\n\nThe branch must already exist on the connected Git repo. No new push is required.`;
+    if (!confirm(confirmText)) return;
+
+    setHosting(name);
+    setError(null);
+    setHostError(null);
+    setActionMsg(null);
+    try {
+      const r = await hostAmplifyBranch(name);
+      setActionMsg(
+        r.action === 'created'
+          ? `Hosted "${r.branchName}" and started a RELEASE job from the current git HEAD.`
+          : `Started a RELEASE job for "${r.branchName}" from the current git HEAD.`,
+      );
+      if (mode === 'form') {
+        setHostName('');
+        setHostOpen(false);
+      }
+      await load();
+    } catch (e) {
+      const msg = nestErrorMessage(e, `Could not host branch "${name}".`);
+      if (mode === 'form') setHostError(msg);
+      else setError(msg);
+    } finally {
+      setHosting(null);
+    }
+  }
+
+  function openHostModal() {
+    setHostError(null);
+    setHostOpen(true);
+  }
+
+  const closeHostModal = useCallback(() => {
+    if (hosting) return;
+    setHostOpen(false);
+    setHostError(null);
+  }, [hosting]);
+
+  const busy = deleting != null || hosting != null;
+  const slotsFull = (payload?.slotAvailable ?? 0) <= 0;
+
   return (
     <RequireAuth>
       <PageContainer>
@@ -114,15 +182,28 @@ export default function AmplifyPage() {
           title="Amplify"
           subtitle="Hosted branches from AWS Amplify. Hidden names are configured in Settings. ClickUp status uses the same branch matching as Previa instances."
           action={
-            <ReloadButton
-              onReload={load}
-              title="Reload Amplify branches"
-              intervalMs={AUTO_RELOAD_INTERVAL_MS}
-            />
+            <div className="flex items-center gap-2">
+              <ReloadButton
+                onReload={load}
+                title="Reload Amplify branches"
+                intervalMs={AUTO_RELOAD_INTERVAL_MS}
+              />
+              {payload?.configured ? (
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  disabled={busy}
+                  onClick={openHostModal}
+                >
+                  Host branch
+                </button>
+              ) : null}
+            </div>
           }
         />
         <div className="card p-5">
           {error ? <div className="alert-error mb-4">{error}</div> : null}
+          {actionMsg ? <div className="alert-success mb-4">{actionMsg}</div> : null}
 
           {payload && !payload.configured ? (
             <p className="text-sm text-white/70">
@@ -360,14 +441,24 @@ export default function AmplifyPage() {
                       )}
                     </td>
                     <td className="border-b border-white/10 px-3 py-2">
-                      <button
-                        type="button"
-                        className="btn border-rose-200/30 bg-rose-200/10 text-xs text-rose-100 hover:bg-rose-200/15 disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={deleting != null}
-                        onClick={() => void onDelete(b.branchName, b.stage)}
-                      >
-                        {deleting === b.branchName ? 'Deleting…' : 'Delete branch'}
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="btn text-xs"
+                          disabled={busy}
+                          onClick={() => void onHost(b.branchName, 'row')}
+                        >
+                          {hosting === b.branchName ? 'Redeploying…' : 'Redeploy'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn border-rose-200/30 bg-rose-200/10 text-xs text-rose-100 hover:bg-rose-200/15 disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={busy}
+                          onClick={() => void onDelete(b.branchName, b.stage)}
+                        >
+                          {deleting === b.branchName ? 'Deleting…' : 'Delete branch'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -388,6 +479,60 @@ export default function AmplifyPage() {
             <p className="text-sm text-white/70">Loading…</p>
           ) : null}
         </div>
+
+        <Modal open={hostOpen} title="Host branch" onClose={closeHostModal}>
+          <p className="text-xs text-[#8b919a]">
+            Starts an Amplify build from the current git HEAD — no push. If the branch is not
+            hosted yet, this creates it (<span className="font-mono">create-branch</span>); if it
+            already exists, this runs <span className="font-mono">start-job --job-type RELEASE</span>.
+          </p>
+          {hostError ? <div className="alert-error mt-3">{hostError}</div> : null}
+          <form
+            className="mt-4 space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void onHost(hostName, 'form');
+            }}
+          >
+            <div>
+              <label className="mb-1.5 block text-sm text-[#b8bcc4]" htmlFor="amplify-host-branch">
+                Git branch name
+              </label>
+              <input
+                id="amplify-host-branch"
+                className="input w-full font-mono"
+                value={hostName}
+                onChange={(e) => setHostName(e.target.value)}
+                placeholder="proj-1024"
+                disabled={!!hosting}
+                autoComplete="off"
+                autoFocus
+              />
+            </div>
+            {slotsFull ? (
+              <p className="text-xs text-amber-200/80">
+                No free Amplify slots — you can still redeploy an existing hosted branch.
+              </p>
+            ) : null}
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className="btn"
+                disabled={!!hosting}
+                onClick={closeHostModal}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn btn-success"
+                disabled={!!hosting || !hostName.trim()}
+              >
+                {hosting && hosting === hostName.trim() ? 'Hosting…' : 'Host branch'}
+              </button>
+            </div>
+          </form>
+        </Modal>
       </PageContainer>
     </RequireAuth>
   );

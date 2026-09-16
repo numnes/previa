@@ -469,6 +469,45 @@ function handleAmplify(
     }
     return { ok: true, branchName: name };
   }
+  if (method === 'POST' && parts[1] === 'branches' && parts[2] === 'host' && parts.length === 3) {
+    const name = String((body as { branchName?: string })?.branchName ?? '').trim();
+    if (!name) throw new DemoHttpError(400, 'Informe o nome da branch.');
+    if (hidden.has(name.toLowerCase())) {
+      throw new DemoHttpError(
+        400,
+        `A branch "${name}" está oculta nas configurações e não pode ser hospedada por aqui.`,
+      );
+    }
+    const existing = s.amplifyBranches.find(
+      (b) => b.branchName.toLowerCase() === name.toLowerCase(),
+    );
+    if (existing) {
+      existing.lastUpdatedAt = new Date().toISOString();
+      return { ok: true, branchName: existing.branchName, action: 'redeployed', jobId: 'demo-job' };
+    }
+    const slotLimit = s.settings.amplifyMaxBranches || 50;
+    if (s.amplifyBranches.length >= slotLimit) {
+      throw new DemoHttpError(
+        400,
+        `Não há slots Amplify disponíveis (${s.amplifyBranches.length}/${slotLimit}). Remova uma branch ou aumente o limite.`,
+      );
+    }
+    const slug = name.replace(/\//g, '-');
+    const domain = `${s.settings.amplifyAppId || 'demo'}.amplifyapp.com`;
+    s.amplifyBranches.push({
+      branchName: name,
+      displayName: name,
+      stage: 'DEVELOPMENT',
+      enableAutoBuild: true,
+      lastUpdatedAt: new Date().toISOString(),
+      previewUrl: `https://${slug}.${domain}`,
+      clickupTaskId: null,
+      clickupTaskUrl: null,
+      clickupTaskStatus: null,
+      clickupTaskName: null,
+    });
+    return { ok: true, branchName: name, action: 'created', jobId: 'demo-job' };
+  }
   throw new DemoHttpError(404, 'Unknown amplify route');
 }
 
