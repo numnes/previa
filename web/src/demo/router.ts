@@ -485,6 +485,10 @@ function handleAmplify(
     );
     if (existing) {
       existing.lastUpdatedAt = new Date().toISOString();
+      existing.lastJobId = 'demo-job';
+      existing.lastJobStatus = 'RUNNING';
+      existing.lastJobStartedAt = existing.lastUpdatedAt;
+      existing.lastJobUrl = `https://${s.settings.amplifyRegion}.console.aws.amazon.com/amplify/apps/${s.settings.amplifyAppId || 'demo'}/branches/${encodeURIComponent(existing.branchName)}/deployments/demo-job`;
       return { ok: true, branchName: existing.branchName, action: 'redeployed', jobId: 'demo-job' };
     }
     const slotLimit = s.settings.amplifyMaxBranches || 50;
@@ -496,12 +500,17 @@ function handleAmplify(
     }
     const slug = name.replace(/\//g, '-');
     const domain = `${s.settings.amplifyAppId || 'demo'}.amplifyapp.com`;
+    const now = new Date().toISOString();
     s.amplifyBranches.push({
       branchName: name,
       displayName: name,
       stage: 'DEVELOPMENT',
       enableAutoBuild: true,
-      lastUpdatedAt: new Date().toISOString(),
+      lastUpdatedAt: now,
+      lastJobId: 'demo-job',
+      lastJobStatus: 'RUNNING',
+      lastJobStartedAt: now,
+      lastJobUrl: `https://${s.settings.amplifyRegion}.console.aws.amazon.com/amplify/apps/${s.settings.amplifyAppId || 'demo'}/branches/${encodeURIComponent(name)}/deployments/demo-job`,
       previewUrl: `https://${slug}.${domain}`,
       clickupTaskId: null,
       clickupTaskUrl: null,

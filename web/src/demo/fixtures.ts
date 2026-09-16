@@ -525,6 +525,23 @@ export const DEMO_INSTANCE_STATIC_PARAMS = [
 export const DEMO_AMPLIFY_APP_ID = 'd0exampleappid';
 export const DEMO_AMPLIFY_DOMAIN = `${DEMO_AMPLIFY_APP_ID}.amplifyapp.com`;
 
+function demoAmplifyJob(
+  branchName: string,
+  status: string,
+  hours: number,
+  jobId: string,
+): Pick<
+  AmplifyBranchRow,
+  'lastJobId' | 'lastJobStatus' | 'lastJobStartedAt' | 'lastJobUrl'
+> {
+  return {
+    lastJobId: jobId,
+    lastJobStatus: status,
+    lastJobStartedAt: hoursAgo(hours),
+    lastJobUrl: `https://us-east-1.console.aws.amazon.com/amplify/apps/${DEMO_AMPLIFY_APP_ID}/branches/${encodeURIComponent(branchName)}/deployments/${jobId}`,
+  };
+}
+
 export function createDemoAmplifyBranches(): AmplifyBranchRow[] {
   return [
     {
@@ -533,6 +550,7 @@ export function createDemoAmplifyBranches(): AmplifyBranchRow[] {
       stage: 'PRODUCTION',
       enableAutoBuild: true,
       lastUpdatedAt: hoursAgo(2),
+      ...demoAmplifyJob('main', 'SUCCEED', 2, '12'),
       previewUrl: `https://main.${DEMO_AMPLIFY_DOMAIN}`,
       clickupTaskId: null,
       clickupTaskUrl: null,
@@ -545,6 +563,7 @@ export function createDemoAmplifyBranches(): AmplifyBranchRow[] {
       stage: 'BETA',
       enableAutoBuild: true,
       lastUpdatedAt: hoursAgo(8),
+      ...demoAmplifyJob('develop', 'SUCCEED', 8, '9'),
       previewUrl: `https://develop.${DEMO_AMPLIFY_DOMAIN}`,
       clickupTaskId: null,
       clickupTaskUrl: null,
@@ -557,6 +576,7 @@ export function createDemoAmplifyBranches(): AmplifyBranchRow[] {
       stage: 'DEVELOPMENT',
       enableAutoBuild: true,
       lastUpdatedAt: hoursAgo(4),
+      ...demoAmplifyJob('proj-1024', 'RUNNING', 0, '4'),
       previewUrl: `https://proj-1024.${DEMO_AMPLIFY_DOMAIN}`,
       clickupTaskId: 'PROJ-1024',
       clickupTaskUrl: 'https://app.clickup.com/t/PROJ-1024',
@@ -569,6 +589,7 @@ export function createDemoAmplifyBranches(): AmplifyBranchRow[] {
       stage: 'DEVELOPMENT',
       enableAutoBuild: true,
       lastUpdatedAt: hoursAgo(1),
+      ...demoAmplifyJob('proj-4491', 'SUCCEED', 1, '7'),
       previewUrl: `https://proj-4491.${DEMO_AMPLIFY_DOMAIN}`,
       clickupTaskId: 'PROJ-4491',
       clickupTaskUrl: 'https://app.clickup.com/t/PROJ-4491',
@@ -581,6 +602,7 @@ export function createDemoAmplifyBranches(): AmplifyBranchRow[] {
       stage: 'EXPERIMENTAL',
       enableAutoBuild: false,
       lastUpdatedAt: hoursAgo(20),
+      ...demoAmplifyJob('feature/checkout-v2', 'FAILED', 20, '2'),
       previewUrl: `https://feature-checkout-v2.${DEMO_AMPLIFY_DOMAIN}`,
       clickupTaskId: null,
       clickupTaskUrl: null,
@@ -593,6 +615,7 @@ export function createDemoAmplifyBranches(): AmplifyBranchRow[] {
       stage: 'PULL_REQUEST',
       enableAutoBuild: true,
       lastUpdatedAt: hoursAgo(6),
+      ...demoAmplifyJob('pr-88', 'SUCCEED', 6, '3'),
       previewUrl: `https://pr-88.${DEMO_AMPLIFY_DOMAIN}`,
       clickupTaskId: 'PROJ-88',
       clickupTaskUrl: 'https://app.clickup.com/t/PROJ-88',

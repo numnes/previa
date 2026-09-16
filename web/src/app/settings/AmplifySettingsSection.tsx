@@ -185,7 +185,8 @@ export function AmplifySettingsSection() {
           <span className="font-mono">amplify:GetApp</span>,{' '}
           <span className="font-mono">amplify:GetBranch</span>,{' '}
           <span className="font-mono">amplify:CreateBranch</span>,{' '}
-          <span className="font-mono">amplify:StartJob</span>, and{' '}
+          <span className="font-mono">amplify:StartJob</span>,{' '}
+          <span className="font-mono">amplify:ListJobs</span>, and{' '}
           <span className="font-mono">amplify:DeleteBranch</span>. Leave keys blank to keep the
           current pair, or to use <span className="font-mono">AWS_ACCESS_KEY_ID</span> / instance
           role on the host.

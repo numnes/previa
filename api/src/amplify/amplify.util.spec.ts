@@ -1,5 +1,6 @@
 import {
   amplifyBranchPreviewUrl,
+  amplifyJobConsoleUrl,
   amplifySlotUsage,
   DEFAULT_AMPLIFY_BRANCH_SLOT_LIMIT,
   isAmplifyBranchHidden,
@@ -50,6 +51,15 @@ describe('amplify.util', () => {
       ),
     ).toBe('https://feature-checkout.d123.amplifyapp.com');
     expect(amplifyBranchPreviewUrl(null, 'main')).toBeNull();
+  });
+
+  it('builds the Amplify console URL for a job', () => {
+    expect(
+      amplifyJobConsoleUrl('us-east-1', 'd0exampleappid', 'proj-1024', '3'),
+    ).toBe(
+      'https://us-east-1.console.aws.amazon.com/amplify/apps/d0exampleappid/branches/proj-1024/deployments/3',
+    );
+    expect(amplifyJobConsoleUrl('', 'd0', 'main', '1')).toBeNull();
   });
 
   it('parses branch slot limit with the AWS default of 50', () => {

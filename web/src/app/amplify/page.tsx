@@ -8,6 +8,8 @@ import { ClientTable } from '@/components/ClientTable';
 import { Modal } from '@/components/Modal';
 import { getUserClient, isAdmin } from '@/lib/client-auth';
 import {
+  amplifyJobStatusBadgeClass,
+  amplifyJobStatusLabel,
   amplifyStageBadgeClass,
   clickupStatusBadgeClass,
 } from '@/lib/status-badge';
@@ -71,7 +73,7 @@ export default function AmplifyPage() {
     const q = search.trim().toLowerCase();
     if (!q) return payload.branches;
     return payload.branches.filter((b) => {
-      const hay = `${b.branchName} ${b.displayName ?? ''} ${b.stage ?? ''} ${b.clickupTaskId ?? ''} ${b.clickupTaskStatus ?? ''}`.toLowerCase();
+      const hay = `${b.branchName} ${b.displayName ?? ''} ${b.stage ?? ''} ${b.lastJobStatus ?? ''} ${b.clickupTaskId ?? ''} ${b.clickupTaskStatus ?? ''}`.toLowerCase();
       return hay.includes(q);
     });
   }, [payload, search]);
@@ -83,7 +85,7 @@ export default function AmplifyPage() {
     [payload],
   );
 
-  const colCount = showClickupCol ? 7 : 6;
+  const colCount = showClickupCol ? 8 : 7;
   const hasSearch = search.trim().length > 0;
   const slotPct = useMemo(() => {
     if (!payload?.slotLimit) return 0;
@@ -344,6 +346,9 @@ export default function AmplifyPage() {
                       Stage
                     </th>
                     <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
+                      Deploy
+                    </th>
+                    <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
                       Auto-build
                     </th>
                     <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
@@ -378,6 +383,34 @@ export default function AmplifyPage() {
                         <span className={amplifyStageBadgeClass(b.stage)}>
                             {b.stage.toLowerCase().replace(/_/g, ' ')}
                         </span>
+                      ) : (
+                        <span className="text-white/45">—</span>
+                      )}
+                    </td>
+                    <td className="border-b border-white/10 px-3 py-2 text-white/70">
+                      {b.lastJobStatus ? (
+                        b.lastJobUrl ? (
+                          <Link
+                            className={`${amplifyJobStatusBadgeClass(b.lastJobStatus)} hover:underline`}
+                            href={b.lastJobUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            title={
+                              b.lastJobStartedAt
+                                ? `Job ${b.lastJobId ?? ''} · ${formatUpdatedAt(b.lastJobStartedAt)}`
+                                : `Job ${b.lastJobId ?? ''}`
+                            }
+                          >
+                            {amplifyJobStatusLabel(b.lastJobStatus)}
+                          </Link>
+                        ) : (
+                          <span
+                            className={amplifyJobStatusBadgeClass(b.lastJobStatus)}
+                            title={b.lastJobId ?? undefined}
+                          >
+                            {amplifyJobStatusLabel(b.lastJobStatus)}
+                          </span>
+                        )
                       ) : (
                         <span className="text-white/45">—</span>
                       )}

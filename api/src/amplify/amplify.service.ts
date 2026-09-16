@@ -5,8 +5,10 @@ import {
   GetAppCommand,
   GetBranchCommand,
   ListBranchesCommand,
+  ListJobsCommand,
   StartJobCommand,
   type Branch,
+  type JobSummary,
 } from '@aws-sdk/client-amplify';
 import {
   BadRequestException,
@@ -29,6 +31,7 @@ import {
 } from '../settings/settings.service';
 import {
   amplifyBranchPreviewUrl,
+  amplifyJobConsoleUrl,
   amplifySlotUsage,
   isAmplifyBranchHidden,
   parseAmplifyHiddenBranches,
@@ -43,6 +46,14 @@ type ClickupBranchFields = {
 };
 
 const CLICKUP_CONCURRENCY = 6;
+const JOB_LIST_CONCURRENCY = 6;
+
+type LatestJobFields = {
+  lastJobId: string | null;
+  lastJobStatus: string | null;
+  lastJobStartedAt: string | null;
+  lastJobUrl: string | null;
+};
 
 export type AmplifyBranchRow = {
   branchName: string;
@@ -50,6 +61,10 @@ export type AmplifyBranchRow = {
   stage: string | null;
   enableAutoBuild: boolean;
   lastUpdatedAt: string | null;
+  lastJobId: string | null;
+  lastJobStatus: string | null;
+  lastJobStartedAt: string | null;
+  lastJobUrl: string | null;
   previewUrl: string | null;
   clickupTaskId: string | null;
   clickupTaskUrl: string | null;
@@ -151,15 +166,22 @@ export class AmplifyService {
       ? await this.enrichClickup(visible, clickupToken, clickupTeamId)
       : new Map<string, ClickupBranchFields>();
 
+    const jobsByBranch = await this.enrichLatestJobs(client, appId, visible, region);
+
     const branches: AmplifyBranchRow[] = visible.map((b) => {
       const branchName = b.branchName as string;
       const clickup = clickupByBranch.get(branchName);
+      const job = jobsByBranch.get(branchName);
       return {
         branchName,
         displayName: b.displayName ?? null,
         stage: b.stage ?? null,
         enableAutoBuild: !!b.enableAutoBuild,
         lastUpdatedAt: b.updateTime ? b.updateTime.toISOString() : null,
+        lastJobId: job?.lastJobId ?? null,
+        lastJobStatus: job?.lastJobStatus ?? null,
+        lastJobStartedAt: job?.lastJobStartedAt ?? null,
+        lastJobUrl: job?.lastJobUrl ?? null,
         previewUrl: amplifyBranchPreviewUrl(defaultDomain, branchName),
         clickupTaskId: clickup?.clickupTaskId ?? extractClickupTaskId(branchName),
         clickupTaskUrl: clickup?.clickupTaskUrl ?? null,
@@ -352,6 +374,38 @@ export class AmplifyService {
     return out;
   }
 
+  private async enrichLatestJobs(
+    client: AmplifyClient,
+    appId: string,
+    branches: Branch[],
+    region: string,
+  ): Promise<Map<string, LatestJobFields>> {
+    const targets = branches
+      .map((b) => b.branchName)
+      .filter((n): n is string => !!n?.trim());
+
+    const results = await mapPool(targets, JOB_LIST_CONCURRENCY, async (branchName) => {
+      try {
+        const page = await client.send(
+          new ListJobsCommand({
+            appId,
+            branchName,
+            maxResults: 1,
+          }),
+        );
+        const job = page.jobSummaries?.[0];
+        return { branchName, fields: jobFieldsFromSummary(job, region, appId, branchName) };
+      } catch (e) {
+        this.log.debug(
+          `Amplify ListJobs failed for ${branchName}: ${awsErrorMessage(e)}`,
+        );
+        return { branchName, fields: emptyJobFields() };
+      }
+    });
+
+    return new Map(results.map((r) => [r.branchName, r.fields]));
+  }
+
   private async enrichClickup(
     branches: Branch[],
     token: string,
@@ -451,7 +505,7 @@ export class AmplifyService {
       )
     ) {
       return new BadRequestException(
-        'Credenciais AWS recusadas. Confira Access Key, Secret, região e as permissões amplify:ListBranches / amplify:GetApp / amplify:GetBranch / amplify:CreateBranch / amplify:StartJob / amplify:DeleteBranch.',
+        'Credenciais AWS recusadas. Confira Access Key, Secret, região e as permissões amplify:ListBranches / amplify:ListJobs / amplify:GetApp / amplify:GetBranch / amplify:CreateBranch / amplify:StartJob / amplify:DeleteBranch.',
       );
     }
     if (status === 404 || /NotFound|ResourceNotFound/i.test(`${name} ${msg}`)) {
@@ -478,6 +532,30 @@ function isAmplifyNotFound(e: unknown): boolean {
 function isAmplifyJobBusy(e: unknown): boolean {
   const msg = `${awsErrorName(e)} ${awsErrorMessage(e)}`;
   return /already (in progress|running)|job is running/i.test(msg);
+}
+
+function emptyJobFields(): LatestJobFields {
+  return {
+    lastJobId: null,
+    lastJobStatus: null,
+    lastJobStartedAt: null,
+    lastJobUrl: null,
+  };
+}
+
+function jobFieldsFromSummary(
+  job: JobSummary | undefined,
+  region: string,
+  appId: string,
+  branchName: string,
+): LatestJobFields {
+  if (!job?.jobId) return emptyJobFields();
+  return {
+    lastJobId: job.jobId,
+    lastJobStatus: job.status ?? null,
+    lastJobStartedAt: job.startTime ? job.startTime.toISOString() : null,
+    lastJobUrl: amplifyJobConsoleUrl(region, appId, branchName, job.jobId),
+  };
 }
 
 function awsErrorMessage(e: unknown): string {

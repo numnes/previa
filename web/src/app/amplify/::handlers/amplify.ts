@@ -7,6 +7,10 @@ export type AmplifyBranchRow = {
   stage: string | null;
   enableAutoBuild: boolean;
   lastUpdatedAt: string | null;
+  lastJobId: string | null;
+  lastJobStatus: string | null;
+  lastJobStartedAt: string | null;
+  lastJobUrl: string | null;
   previewUrl: string | null;
   clickupTaskId: string | null;
   clickupTaskUrl: string | null;

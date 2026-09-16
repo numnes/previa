@@ -63,6 +63,40 @@ export function clickupStatusBadgeClass(status: string): string {
   return `${BASE} border-white/15 bg-white/10 text-white/75`;
 }
 
+export function amplifyJobStatusBadgeClass(status: string | null | undefined): string {
+  const s = (status ?? '').trim().toUpperCase();
+  if (s === 'SUCCEED') {
+    return `${BASE} border-emerald-400/35 bg-emerald-500/15 text-emerald-100/90`;
+  }
+  if (s === 'FAILED') {
+    return `${BASE} border-rose-400/40 bg-rose-500/15 text-rose-100/90`;
+  }
+  if (s === 'RUNNING' || s === 'PROVISIONING' || s === 'CANCELLING') {
+    return `${BASE} border-sky-400/35 bg-sky-500/15 text-sky-100/90`;
+  }
+  if (s === 'PENDING' || s === 'CREATED') {
+    return `${BASE} border-amber-400/35 bg-amber-500/15 text-amber-100/90`;
+  }
+  if (s === 'CANCELLED') {
+    return `${BASE} border-slate-400/30 bg-slate-500/15 text-slate-100/90`;
+  }
+  return `${BASE} border-white/15 bg-white/10 text-white/75`;
+}
+
+export function amplifyJobStatusLabel(status: string | null | undefined): string {
+  const s = (status ?? '').trim().toUpperCase();
+  if (!s) return '';
+  if (s === 'SUCCEED') return 'Succeeded';
+  if (s === 'FAILED') return 'Failed';
+  if (s === 'RUNNING') return 'Running';
+  if (s === 'PROVISIONING') return 'Provisioning';
+  if (s === 'PENDING') return 'Pending';
+  if (s === 'CREATED') return 'Created';
+  if (s === 'CANCELLING') return 'Cancelling';
+  if (s === 'CANCELLED') return 'Cancelled';
+  return s.charAt(0) + s.slice(1).toLowerCase();
+}
+
 export function amplifyStageBadgeClass(stage: string | null | undefined): string {
   const s = (stage ?? '').trim().toLowerCase();
   if (s === 'production') {

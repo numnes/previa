@@ -52,6 +52,20 @@ export function isAmplifyBranchHidden(
   return hidden.some((h) => h.trim().toLowerCase() === needle);
 }
 
+export function amplifyJobConsoleUrl(
+  region: string,
+  appId: string,
+  branchName: string,
+  jobId: string,
+): string | null {
+  const r = region.trim();
+  const app = appId.trim();
+  const branch = branchName.trim();
+  const job = jobId.trim();
+  if (!r || !app || !branch || !job) return null;
+  return `https://${r}.console.aws.amazon.com/amplify/apps/${encodeURIComponent(app)}/branches/${encodeURIComponent(branch)}/deployments/${encodeURIComponent(job)}`;
+}
+
 export function amplifyBranchPreviewUrl(
   defaultDomain: string | null | undefined,
   branchName: string,
