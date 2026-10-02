@@ -190,6 +190,11 @@ export class ClusterAggregatorService {
       nodeId: LOCAL_NODE_ID,
       nodeLabel: local.nodeLabel,
     }));
+    let deployQueue = (localSummary.deployQueue ?? []).map((item) => ({
+      ...item,
+      nodeId: LOCAL_NODE_ID,
+      nodeLabel: local.nodeLabel,
+    }));
 
     const remotes = await this.nodes.findEnabled();
     for (const node of remotes) {
@@ -220,6 +225,15 @@ export class ClusterAggregatorService {
             nodeId: node.id,
             nodeLabel: node.label,
             instanceId: encodeRemoteId(node.id, e.instanceId),
+          })),
+        ];
+        deployQueue = [
+          ...deployQueue,
+          ...(summary.deployQueue ?? []).map((item) => ({
+            ...item,
+            id: encodeRemoteId(node.id, item.id),
+            nodeId: node.id,
+            nodeLabel: node.label,
           })),
         ];
       } catch (e) {
@@ -260,9 +274,15 @@ export class ClusterAggregatorService {
     );
     recentStatusChanges = recentStatusChanges.slice(0, 20);
 
+    deployQueue.sort(
+      (a, b) =>
+        new Date(a.waitingSince).getTime() - new Date(b.waitingSince).getTime(),
+    );
+
     return {
       maxActiveInstances,
       instancesByStatus,
+      deployQueue,
       recentProjects,
       host: localSummary.host,
       hosts,
@@ -324,6 +344,34 @@ export class ClusterAggregatorService {
     const updated = await this.clusterFetch<InstanceListItem>(
       node,
       `/cluster/instances/${encodeURIComponent(remoteId)}/awake`,
+      { method: 'POST' },
+    );
+    return this.tag(updated, ref, encodeRemoteId(node.id, updated.id));
+  }
+
+  async cancelRemoteDeploy(
+    nodeId: string,
+    remoteId: string,
+  ): Promise<WithNode<InstanceListItem>> {
+    const node = await this.nodes.findById(nodeId);
+    const ref = this.remoteRef(node);
+    const updated = await this.clusterFetch<InstanceListItem>(
+      node,
+      `/cluster/instances/${encodeURIComponent(remoteId)}/cancel-deploy`,
+      { method: 'POST' },
+    );
+    return this.tag(updated, ref, encodeRemoteId(node.id, updated.id));
+  }
+
+  async forceRestartRemoteDeploy(
+    nodeId: string,
+    remoteId: string,
+  ): Promise<WithNode<InstanceListItem>> {
+    const node = await this.nodes.findById(nodeId);
+    const ref = this.remoteRef(node);
+    const updated = await this.clusterFetch<InstanceListItem>(
+      node,
+      `/cluster/instances/${encodeURIComponent(remoteId)}/force-redeploy`,
       { method: 'POST' },
     );
     return this.tag(updated, ref, encodeRemoteId(node.id, updated.id));

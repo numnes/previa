@@ -75,7 +75,14 @@ cleanup_merged_env() {
     rm -f "$MERGED_ENV_FILE"
   fi
 }
-trap cleanup_merged_env EXIT
+# PID do processo de deploy (grupo), para cancelar/reiniciar mesmo após restart da API.
+mkdir -p "${PREVIA_STATE_DIR}"
+echo $$ > "${PREVIA_STATE_DIR}/${BASE_NAME}.deploy.pid"
+cleanup_on_exit() {
+  rm -f "${PREVIA_STATE_DIR}/${BASE_NAME}.deploy.pid"
+  cleanup_merged_env
+}
+trap cleanup_on_exit EXIT
 
 clone_or_update_repo() {
   if [[ -d "${TARGET_DIR}/.git" ]]; then

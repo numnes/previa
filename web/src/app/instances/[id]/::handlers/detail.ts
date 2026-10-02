@@ -51,6 +51,22 @@ export async function awakeInstance(id: string): Promise<InstanceRow> {
   });
 }
 
+export async function cancelDeploy(id: string): Promise<InstanceRow> {
+  const token = getTokenClient();
+  return await httpJson<InstanceRow>(`${apiBaseClient()}/instances/${id}/cancel-deploy`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function forceRedeploy(id: string): Promise<InstanceRow> {
+  const token = getTokenClient();
+  return await httpJson<InstanceRow>(`${apiBaseClient()}/instances/${id}/force-redeploy`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export async function removeInstance(id: string): Promise<{ ok: true }> {
   const token = getTokenClient();
   return await httpJson<{ ok: true }>(`${apiBaseClient()}/instances/${id}/remove`, {

@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { randomBytes } from 'crypto';
 import { existsSync } from 'fs';
 import { readFile, unlink, writeFile } from 'fs/promises';
@@ -28,6 +28,109 @@ function coreStateDir(workRoot: string): string {
 
 function deployResultPath(workRoot: string, pm2Name: string): string {
   return join(coreStateDir(workRoot), `${pm2Name}.deploy-result.json`);
+}
+
+function deployPidPath(workRoot: string, projectSlug: string, branch: string): string {
+  return join(coreStateDir(workRoot), `${pm2AppName(projectSlug, branch)}.deploy.pid`);
+}
+
+/** Sessão própria para poder matar o grupo (git/npm/docker) sem derrubar a API. */
+function runDetachedScript(
+  script: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(script, args, {
+      env,
+      detached: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let output = '';
+    const append = (chunk: Buffer | string) => {
+      output += chunk.toString();
+      if (output.length > 200_000) output = output.slice(-200_000);
+    };
+    child.stdout?.on('data', append);
+    child.stderr?.on('data', append);
+    child.on('error', reject);
+    child.on('close', (code, signal) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      const err = new Error(
+        `Command failed: ${script} (code ${code ?? 'null'}${signal ? `, signal ${signal}` : ''})`,
+      ) as Error & { stderr?: string };
+      err.stderr = output;
+      reject(err);
+    });
+  });
+}
+
+function signalPid(pid: number, signal: NodeJS.Signals): boolean {
+  try {
+    process.kill(-pid, signal);
+    return true;
+  } catch {
+    try {
+      process.kill(pid, signal);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+/** Mata o deploy.sh em andamento (e filhos) a partir do PID gravado no state dir. */
+export async function killCoreDeployProcess(
+  config: ConfigService,
+  projectSlug: string,
+  branch: string,
+): Promise<boolean> {
+  const workRoot = config.get<string>('PREVIA_WORK_ROOT');
+  if (!workRoot) return false;
+  const pidPath = deployPidPath(workRoot, projectSlug, branch);
+  let pid = 0;
+  try {
+    pid = Number((await readFile(pidPath, 'utf8')).trim());
+  } catch {
+    return false;
+  }
+  if (!Number.isInteger(pid) || pid <= 1) return false;
+  signalPid(pid, 'SIGTERM');
+  await new Promise((r) => setTimeout(r, 1500));
+  signalPid(pid, 'SIGKILL');
+  await unlink(pidPath).catch(() => undefined);
+  return true;
+}
+
+/** Para o runtime da cor de staging, sem mexer no nginx da versão live. */
+export async function abortStagingDeploy(
+  config: ConfigService,
+  projectSlug: string,
+  branch: string,
+): Promise<void> {
+  const workRoot = config.get<string>('PREVIA_WORK_ROOT');
+  if (!workRoot) return;
+  const base = pm2AppName(projectSlug, branch);
+  const stateDir = coreStateDir(workRoot);
+  let live = 'primary';
+  try {
+    const raw = (await readFile(join(stateDir, `${base}.live`), 'utf8')).trim();
+    if (raw === 'next' || raw === 'primary') live = raw;
+  } catch {
+    /* default primary */
+  }
+  const stagingColor = live === 'next' ? 'primary' : 'next';
+  const stagingName = stagingColor === 'next' ? `${base}.next` : base;
+  const meta = {
+    port: 0,
+    pm2Name: base,
+    stagingPm2Name: stagingName,
+    stagingColor,
+  } as DeployMeta;
+  await runCoreAbortZeroDowntime(config, projectSlug, branch, meta);
 }
 
 export type DeployAppEnvInput = {
@@ -82,10 +185,7 @@ export async function runCoreDeployScript(
 
   const script = join(binDir, 'deploy.sh');
   try {
-    await execFileAsync(script, [projectSlug, gitUrl, branch], {
-      env,
-      maxBuffer: 10 * 1024 * 1024,
-    });
+    await runDetachedScript(script, [projectSlug, gitUrl, branch], env);
   } finally {
     if (envFilePath) {
       await unlink(envFilePath).catch(() => undefined);

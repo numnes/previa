@@ -90,6 +90,26 @@ export class InstancesController {
   }
 
   @ApiBearerAuth('jwt')
+  @ApiOkResponse({
+    description: 'Cancela o deploy em andamento e mata o processo de build',
+  })
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/cancel-deploy')
+  cancelDeploy(@Param('id') id: string) {
+    return this.instances.cancelDeploy(id);
+  }
+
+  @ApiBearerAuth('jwt')
+  @ApiOkResponse({
+    description: 'Mata o build atual e recomeça o deploy',
+  })
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/force-redeploy')
+  forceRedeploy(@Param('id') id: string) {
+    return this.instances.forceRestartDeploy(id);
+  }
+
+  @ApiBearerAuth('jwt')
   @ApiOkResponse({ description: 'Remove instância (destroy + remove do banco, admin only)' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')

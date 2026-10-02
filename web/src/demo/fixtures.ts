@@ -445,6 +445,16 @@ export function buildDashboardSummary(
   return {
     maxActiveInstances: 8,
     instancesByStatus,
+    deployQueue: instances
+      .filter((i) => i.status === 'waiting')
+      .map((i) => ({
+        id: i.id,
+        projectSlug: i.projectSlug,
+        branch: i.branch,
+        waitingSince: i.createdAt,
+        nodeId: i.nodeId,
+        nodeLabel: i.nodeLabel,
+      })),
     recentProjects: projects
       .slice()
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))

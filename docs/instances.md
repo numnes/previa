@@ -39,8 +39,8 @@ Preview / ephemeral environment lifecycle:
 | Status      | Meaning                                              |
 | ----------- | ---------------------------------------------------- |
 | `active`    | Running on the host (PM2 + nginx) — live review app. During a zero-downtime redeploy the status stays `active` while a staging build runs; UI may show a ZD-in-progress indicator. |
-| `waiting`   | Registered, waiting for a free slot (queued preview). Zero-downtime redeploys of an already-active branch do **not** enter the waiting queue or require a free slot. |
-| `deploying` | Classic deploy job in progress (includes optional health check polling). Not used for zero-downtime redeploys of an already-active instance. |
+| `waiting`   | Registered, waiting for a free slot (queued preview). The dashboard **Deploying** card has a **Queue** button that lists these instances. Zero-downtime redeploys of an already-active branch do **not** enter this queue or require a free slot. |
+| `deploying` | Classic deploy job in progress (includes optional health check polling). Not used for zero-downtime redeploys of an already-active instance. If Previa stops mid-build, the row can stay here with no worker; **Cancel deploy** kills the build and marks `error`, **Restart deploy** kills it and starts again. |
 | `paused`    | Stopped on the host, still in the database           |
 | `error`     | Last deploy or activate failed (classic path). Zero-downtime failures keep `active` and set `lastDeployError` instead. |
 

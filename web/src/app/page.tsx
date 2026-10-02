@@ -17,6 +17,8 @@ import {
 } from '@/components/icons';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Modal } from '@/components/Modal';
 import {
   Cell,
   Legend,
@@ -172,8 +174,10 @@ function HostResourcesBlock({
 }
 
 export default function HomePage() {
+  const router = useRouter();
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [queueOpen, setQueueOpen] = useState(false);
 
   const load = useCallback(async () => {
     setErr(null);
@@ -190,6 +194,7 @@ export default function HomePage() {
   }, [load]);
 
   const hosts = data?.hosts ?? [];
+  const deployQueue = data?.deployQueue ?? [];
 
   const activeCount = data?.instancesByStatus.active ?? 0;
   const maxSlots = data?.maxActiveInstances ?? 0;
@@ -252,6 +257,36 @@ export default function HomePage() {
                 const cfg = STATUS_CONFIG[status];
                 const Icon = cfg.icon;
                 const count = data?.instancesByStatus[status] ?? 0;
+                if (status === 'deploying') {
+                  return (
+                    <div
+                      key={status}
+                      className={`relative flex aspect-square flex-col items-center justify-center rounded-xl border p-3 transition hover:brightness-110 ${cfg.card} ${cfg.border}`}
+                    >
+                      <button
+                        type="button"
+                        className="absolute top-2 right-2 rounded-md border border-amber-300/30 bg-black/30 px-1.5 py-0.5 text-[10px] font-medium text-amber-100 hover:bg-black/50"
+                        title="Show instances waiting to deploy"
+                        onClick={() => setQueueOpen(true)}
+                      >
+                        Queue{deployQueue.length > 0 ? ` ${deployQueue.length}` : ''}
+                      </button>
+                      <button
+                        type="button"
+                        className="flex flex-1 flex-col items-center justify-center"
+                        onClick={() => router.push('/instances?status=deploying')}
+                      >
+                        <Icon className={`h-5 w-5 ${cfg.iconColor}`} />
+                        <div className={`mt-2 text-2xl font-bold tabular-nums ${cfg.valueColor}`}>
+                          {data != null ? count : '—'}
+                        </div>
+                        <div className={`mt-0.5 text-center text-[11px] font-medium ${cfg.labelColor}`}>
+                          {cfg.label}
+                        </div>
+                      </button>
+                    </div>
+                  );
+                }
                 return (
                   <Link
                     key={status}
@@ -418,6 +453,44 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+        <Modal
+          open={queueOpen}
+          title="Deploy queue"
+          onClose={() => setQueueOpen(false)}
+          labelledBy="deploy-queue-title"
+        >
+          <p className="text-xs text-white/55">
+            Instances waiting for a free deploy slot, oldest first. They start automatically when a
+            slot opens.
+          </p>
+          {deployQueue.length === 0 ? (
+            <p className="mt-3 text-sm text-white/50">No instances are waiting to deploy.</p>
+          ) : (
+            <ul className="mt-3 max-h-80 space-y-2 overflow-auto text-sm">
+              {deployQueue.map((item, index) => (
+                <li key={item.id}>
+                  <Link
+                    href={`/instances/${item.id}`}
+                    className="flex items-baseline justify-between gap-3 rounded-lg border border-white/10 px-3 py-2 hover:bg-white/5"
+                    onClick={() => setQueueOpen(false)}
+                  >
+                    <span className="min-w-0">
+                      <span className="mr-2 font-mono text-xs text-white/40">{index + 1}</span>
+                      <span className="font-medium text-white/90">{item.projectSlug}</span>
+                      <span className="ml-2 font-mono text-xs text-white/60">{item.branch}</span>
+                      {item.nodeLabel ? (
+                        <span className="ml-2 text-xs text-white/40">{item.nodeLabel}</span>
+                      ) : null}
+                    </span>
+                    <span className="shrink-0 text-xs text-white/45">
+                      {new Date(item.waitingSince).toLocaleString('en-US')}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Modal>
       </PageContainer>
     </RequireAuth>
   );

@@ -270,6 +270,43 @@ async function handleInstances(
     if (row.status !== 'active') throw new DemoHttpError(400, 'Only active');
     return touchInstance(parts[1], { status: 'paused', port: null, idleSleep: false });
   }
+  if (method === 'POST' && parts.length === 3 && parts[2] === 'cancel-deploy') {
+    await delay(300);
+    const row = s.instances.find((i) => i.id === parts[1]);
+    if (!row) throw new DemoHttpError(404, 'Instance not found');
+    if (!row.canWrite) throw new DemoHttpError(403, 'Read-only node');
+    if (row.status !== 'deploying' && !row.zeroDowntimeInProgress) {
+      throw new DemoHttpError(400, 'No deploy in progress');
+    }
+    if (row.zeroDowntimeInProgress && row.status === 'active') {
+      return touchInstance(parts[1], {
+        zeroDowntimeInProgress: false,
+        lastDeployError:
+          'Zero-downtime deploy cancelled. The previous version is still serving.',
+      });
+    }
+    return touchInstance(parts[1], {
+      status: 'error',
+      zeroDowntimeInProgress: false,
+      lastDeployError: 'Deploy cancelled. The build process was stopped.',
+    });
+  }
+  if (method === 'POST' && parts.length === 3 && parts[2] === 'force-redeploy') {
+    await delay(300);
+    const row = s.instances.find((i) => i.id === parts[1]);
+    if (!row) throw new DemoHttpError(404, 'Instance not found');
+    if (!row.canWrite) throw new DemoHttpError(403, 'Read-only node');
+    if (row.status !== 'deploying' && !row.zeroDowntimeInProgress) {
+      throw new DemoHttpError(400, 'No deploy in progress');
+    }
+    const next = touchInstance(parts[1], {
+      status: row.status === 'active' ? 'active' : 'deploying',
+      lastDeployError: null,
+      zeroDowntimeInProgress: row.status === 'active',
+    });
+    scheduleDemoDeploy(parts[1]);
+    return next;
+  }
   if (method === 'POST' && parts.length === 3 && parts[2] === 'activate') {
     await delay(300);
     const row = s.instances.find((i) => i.id === parts[1]);

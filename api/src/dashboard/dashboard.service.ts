@@ -10,9 +10,19 @@ import { SettingsService } from '../settings/settings.service';
 
 const execFileAsync = promisify(execFile);
 
+export type DeployQueueEntry = {
+  id: string;
+  projectSlug: string;
+  branch: string;
+  /** Quando a instância entrou na fila (createdAt da linha, ordem FIFO). */
+  waitingSince: string;
+};
+
 export type DashboardSummary = {
   maxActiveInstances: number;
   instancesByStatus: Record<string, number>;
+  /** Instâncias `waiting` — fila para deploy quando os slots estão cheios. */
+  deployQueue: DeployQueueEntry[];
   recentProjects: { slug: string; lastActivityAt: string }[];
   host: {
     cpu: { cores: number; loadavg1: number; loadavg5: number; loadavg15: number };
@@ -72,6 +82,18 @@ export class DashboardService {
       lastActivityAt: new Date(r.lastAt).toISOString(),
     }));
 
+    const waitingRows = await this.instances.find({
+      where: { status: 'waiting' },
+      relations: ['project'],
+      order: { createdAt: 'ASC' },
+    });
+    const deployQueue: DeployQueueEntry[] = waitingRows.map((row) => ({
+      id: row.id,
+      projectSlug: row.project?.slug ?? '(removido)',
+      branch: row.branch,
+      waitingSince: row.createdAt.toISOString(),
+    }));
+
     const ev = await this.events
       .createQueryBuilder('e')
       .orderBy('e.created_at', 'DESC')
@@ -103,6 +125,7 @@ export class DashboardService {
     return {
       maxActiveInstances,
       instancesByStatus,
+      deployQueue,
       recentProjects,
       host,
       recentStatusChanges,

@@ -90,6 +90,18 @@ export class ClusterRemoteController {
   }
 
   @RequireClusterWrite()
+  @Post('instances/:id/cancel-deploy')
+  cancelDeploy(@Param('id') id: string) {
+    return this.instances.cancelDeploy(id);
+  }
+
+  @RequireClusterWrite()
+  @Post('instances/:id/force-redeploy')
+  forceRedeploy(@Param('id') id: string) {
+    return this.instances.forceRestartDeploy(id);
+  }
+
+  @RequireClusterWrite()
   @Post('instances/:id/remove')
   remove(@Param('id') id: string) {
     return this.instances.remove(id);

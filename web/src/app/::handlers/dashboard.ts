@@ -8,9 +8,19 @@ export type HostStats = {
   disk: { path: string; totalBytes: number; freeBytes: number; usedBytes: number; usedPct: number };
 };
 
+export type DeployQueueEntry = {
+  id: string;
+  projectSlug: string;
+  branch: string;
+  waitingSince: string;
+  nodeId?: string;
+  nodeLabel?: string;
+};
+
 export type DashboardSummary = {
   maxActiveInstances: number;
   instancesByStatus: Record<string, number>;
+  deployQueue?: DeployQueueEntry[];
   recentProjects: {
     slug: string;
     lastActivityAt: string;

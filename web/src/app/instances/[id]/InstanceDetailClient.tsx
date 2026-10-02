@@ -17,6 +17,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   activateInstance,
   awakeInstance,
+  cancelDeploy,
+  forceRedeploy,
   getInstance,
   getInstanceLogs,
   patchInstance,
@@ -35,7 +37,7 @@ import {
 } from '@/lib/status-badge';
 
 type InstanceTab = 'overview' | 'environment' | 'logs';
-type StatusAction = 'pause' | 'activate' | 'awake' | 'remove' | null;
+type StatusAction = 'pause' | 'activate' | 'awake' | 'remove' | 'cancel' | 'restart' | null;
 
 const TERMINAL_STATUSES = new Set(['active', 'paused', 'waiting', 'error']);
 
@@ -423,6 +425,95 @@ export default function InstanceDetailClient() {
     }
   }, [row, id, toast, router]);
 
+  const deployInProgress = row?.status === 'deploying' || !!row?.zeroDowntimeInProgress;
+
+  const runCancelDeploy = useCallback(async () => {
+    if (!row || actionLock.current) return;
+    if (
+      !confirm(
+        `Cancel the deploy for ${row.projectSlug} / ${row.branch}?\n\nThe build process will be killed. A classic deploy is marked as error. A zero-downtime deploy keeps the previous version serving.`,
+      )
+    ) {
+      return;
+    }
+    actionLock.current = true;
+    setStatusAction('cancel');
+    const toastId = toast.push({
+      title: 'Cancelling deploy…',
+      description: 'Stopping the build process.',
+      variant: 'loading',
+    });
+    try {
+      const updated = await cancelDeploy(id);
+      setRow(updated);
+      toast.update(toastId, {
+        title: 'Deploy cancelled',
+        description:
+          updated.status === 'active'
+            ? 'Previous version is still serving.'
+            : 'Build stopped. The instance is no longer deploying.',
+        variant: 'success',
+      });
+    } catch (e) {
+      toast.update(toastId, {
+        title: 'Could not cancel deploy',
+        description: e instanceof Error ? e.message : 'The request failed. Try again.',
+        variant: 'error',
+      });
+    } finally {
+      setStatusAction(null);
+      actionLock.current = false;
+    }
+  }, [row, id, toast]);
+
+  const runForceRedeploy = useCallback(async () => {
+    if (!row || actionLock.current) return;
+    if (
+      !confirm(
+        `Force restart the deploy for ${row.projectSlug} / ${row.branch}?\n\nThe current build is killed, then the deploy starts again.`,
+      )
+    ) {
+      return;
+    }
+    actionLock.current = true;
+    setStatusAction('restart');
+    const toastId = toast.push({
+      title: 'Restarting deploy…',
+      description: 'Stopping the current build, then starting again.',
+      variant: 'loading',
+    });
+    try {
+      let updated = await forceRedeploy(id);
+      setRow(updated);
+      if (updated.status === 'deploying' || updated.zeroDowntimeInProgress) {
+        const settled = await waitUntilStatusSettled(toastId, 'Restarting deploy…');
+        if (settled) {
+          updated = settled;
+          setRow(settled);
+        }
+      }
+      toast.update(toastId, {
+        title: updated.status === 'error' ? 'Deploy failed' : 'Deploy restarted',
+        description:
+          updated.status === 'active' && updated.lastDeployError
+            ? 'Zero-downtime deploy failed. Previous version is still serving.'
+            : `Instance is now ${updated.status}.`,
+        variant: updated.status === 'error' || (updated.status === 'active' && updated.lastDeployError)
+          ? 'error'
+          : 'success',
+      });
+    } catch (e) {
+      toast.update(toastId, {
+        title: 'Could not restart deploy',
+        description: e instanceof Error ? e.message : 'The request failed. Try again.',
+        variant: 'error',
+      });
+    } finally {
+      setStatusAction(null);
+      actionLock.current = false;
+    }
+  }, [row, id, toast, waitUntilStatusSettled]);
+
   return (
     <RequireAuth>
       <PageContainer>
@@ -622,6 +713,28 @@ export default function InstanceDetailClient() {
                           {statusAction === 'activate' ? 'Working…' : 'Activate / redeploy'}
                         </button>
                       )}
+                      {deployInProgress ? (
+                        <>
+                          <button
+                            type="button"
+                            className="btn text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={statusBusy || !row.canWrite}
+                            title="Kill the current build and start the deploy again"
+                            onClick={() => void runForceRedeploy()}
+                          >
+                            {statusAction === 'restart' ? 'Restarting…' : 'Restart deploy'}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn text-sm border-amber-200/30 bg-amber-200/10 text-amber-100 hover:bg-amber-200/15 disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={statusBusy || !row.canWrite}
+                            title="Kill the current build and stop this deploy"
+                            onClick={() => void runCancelDeploy()}
+                          >
+                            {statusAction === 'cancel' ? 'Cancelling…' : 'Cancel deploy'}
+                          </button>
+                        </>
+                      ) : null}
                       {admin ? (
                         <button
                           type="button"

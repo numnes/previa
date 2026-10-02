@@ -117,6 +117,24 @@ export class InstancesService {
     return this.cluster.tagLocal(row);
   }
 
+  async cancelDeploy(id: string): Promise<InstanceListItem> {
+    const remote = parseRemoteId(id);
+    if (remote) {
+      return this.cluster.cancelRemoteDeploy(remote.nodeId, remote.remoteId);
+    }
+    const row = await this.previewInstances.cancelDeploy(id);
+    return this.cluster.tagLocal(row);
+  }
+
+  async forceRestartDeploy(id: string): Promise<InstanceListItem> {
+    const remote = parseRemoteId(id);
+    if (remote) {
+      return this.cluster.forceRestartRemoteDeploy(remote.nodeId, remote.remoteId);
+    }
+    const row = await this.previewInstances.forceRestartDeploy(id);
+    return this.cluster.tagLocal(row);
+  }
+
   async remove(id: string): Promise<{ ok: true }> {
     const remote = parseRemoteId(id);
     if (remote) {

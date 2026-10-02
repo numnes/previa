@@ -23,6 +23,8 @@ import type { DeployMeta } from '../deploy/deploy-meta';
 import type { DeployJobPayload } from '../deploy/deploy.processor';
 import { formatDeployError } from '../deploy/format-deploy-error';
 import {
+  abortStagingDeploy,
+  killCoreDeployProcess,
   runCoreAbortZeroDowntime,
   runCoreDeployScript,
   runCorePauseScript,
@@ -158,6 +160,11 @@ export class PreviewInstancesService {
   private readonly log = new Logger(PreviewInstancesService.name);
   /** Fila de wake (idle sleep); concorrência = PREVIA_DEPLOY_CONCURRENCY. */
   private readonly wakeQueue: WakeQueue;
+  /**
+   * Enquanto o job ativo morre por cancel/restart, não gravar status error
+   * genérico por cima da transição explícita.
+   */
+  private readonly suppressDeployFinalize = new Set<string>();
 
   constructor(
     @InjectRepository(PreviewInstance)
@@ -234,6 +241,164 @@ export class PreviewInstancesService {
     await job.remove();
     this.log.log(`Deploy job ${jobId} cancelado (instância entrou em idle sleep)`);
     return true;
+  }
+
+  private deployInterruptKey(projectSlug: string, branch: string): string {
+    return `${projectSlug}/${branch}`;
+  }
+
+  /** Mata o build e espera o job BullMQ soltar o id estável. */
+  private async stopInFlightDeploy(
+    projectSlug: string,
+    branch: string,
+  ): Promise<void> {
+    const key = this.deployInterruptKey(projectSlug, branch);
+    this.suppressDeployFinalize.add(key);
+    try {
+      await killCoreDeployProcess(this.config, projectSlug, branch);
+      await this.waitAndRemoveDeployJob(projectSlug, branch);
+    } finally {
+      this.suppressDeployFinalize.delete(key);
+    }
+  }
+
+  private async waitAndRemoveDeployJob(
+    projectSlug: string,
+    branch: string,
+  ): Promise<void> {
+    const jobId = `deploy:${projectSlug}:${sanitizeBranchSlug(branch)}`;
+    const started = Date.now();
+    while (Date.now() - started < 20_000) {
+      const job = await this.deployQueue.getJob(jobId);
+      if (!job) return;
+      const state = await job.getState();
+      if (state !== 'active') {
+        await job.remove().catch(() => undefined);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    const stuck = await this.deployQueue.getJob(jobId);
+    if (!stuck) return;
+    try {
+      await stuck.remove();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.log.warn(`Não foi possível remover o job de deploy ${jobId}: ${msg}`);
+    }
+  }
+
+  /**
+   * Cancela um deploy preso em `deploying` (ou staging ZD): mata o build.
+   * Clássico vira `error` e libera o slot. ZD mantém a versão anterior no ar.
+   */
+  async cancelDeploy(id: string): Promise<InstanceListItem> {
+    const row = await this.repo.findOne({
+      where: { id },
+      relations: ['project'],
+    });
+    if (!row?.project) throw new NotFoundException();
+    const zd = row.status === 'active' && row.zeroDowntimeInProgress;
+    if (row.status !== 'deploying' && !zd) {
+      throw new BadRequestException(
+        'Só é possível cancelar um deploy que está em andamento',
+      );
+    }
+
+    await this.stopInFlightDeploy(row.project.slug, row.branch);
+
+    if (zd) {
+      await abortStagingDeploy(this.config, row.project.slug, row.branch).catch(
+        (e) => {
+          const msg = e instanceof Error ? e.message : String(e);
+          this.log.warn(`abort staging ${row.project.slug}/${row.branch}: ${msg}`);
+        },
+      );
+      const fresh = await this.repo.findOne({ where: { id } });
+      if (fresh) {
+        fresh.zeroDowntimeInProgress = false;
+        fresh.lastDeployError =
+          'Zero-downtime deploy cancelled. The previous version is still serving.';
+        await this.repo.save(fresh);
+      }
+    } else {
+      await runCorePauseScript(this.config, row.project.slug, row.branch).catch(
+        (e) => {
+          const msg = e instanceof Error ? e.message : String(e);
+          this.log.warn(`pause após cancel ${row.project.slug}/${row.branch}: ${msg}`);
+        },
+      );
+      const fresh = await this.repo.findOne({ where: { id } });
+      if (fresh) {
+        fresh.zeroDowntimeInProgress = false;
+        fresh.lastDeployError =
+          'Deploy cancelled. The build process was stopped.';
+        await this.repo.save(fresh);
+        if (fresh.status !== 'error') {
+          await this.setStatus(fresh, 'error');
+        }
+      }
+    }
+
+    await this.processWaitingQueue();
+    const maps = await this.fetchRuntimeMaps();
+    const updated = await this.repo.findOne({
+      where: { id },
+      relations: ['project'],
+    });
+    return this.buildListItem(updated as PreviewInstance, maps);
+  }
+
+  /**
+   * Mata o build atual e enfileira o deploy de novo, reusando o slot
+   * se a instância ainda está `deploying`.
+   */
+  async forceRestartDeploy(id: string): Promise<InstanceListItem> {
+    const row = await this.repo.findOne({
+      where: { id },
+      relations: ['project'],
+    });
+    if (!row?.project) throw new NotFoundException();
+    const zd = row.status === 'active' && row.zeroDowntimeInProgress;
+    if (row.status !== 'deploying' && !zd) {
+      throw new BadRequestException(
+        'Só é possível reiniciar um deploy que está em andamento',
+      );
+    }
+
+    await this.stopInFlightDeploy(row.project.slug, row.branch);
+
+    if (zd) {
+      await abortStagingDeploy(this.config, row.project.slug, row.branch).catch(
+        (e) => {
+          const msg = e instanceof Error ? e.message : String(e);
+          this.log.warn(`abort staging ${row.project.slug}/${row.branch}: ${msg}`);
+        },
+      );
+    }
+
+    const fresh = await this.repo.findOne({ where: { id } });
+    if (!fresh) throw new NotFoundException();
+    fresh.lastDeployError = null;
+    fresh.zeroDowntimeInProgress = zd;
+    if (!zd && fresh.status !== 'deploying') {
+      fresh.status = 'deploying';
+    }
+    await this.repo.save(fresh);
+
+    await this.enqueueRedeployJob(
+      row.project.slug,
+      row.branch,
+      row.project.gitUrl,
+      { forceFullDeploy: true },
+    );
+
+    const maps = await this.fetchRuntimeMaps();
+    const updated = await this.repo.findOne({
+      where: { id },
+      relations: ['project'],
+    });
+    return this.buildListItem(updated as PreviewInstance, maps);
   }
 
   async resolveBranchSlug(projectSlug: string, branch: string): Promise<string> {
@@ -802,6 +967,12 @@ export class PreviewInstancesService {
       });
       if (!row) return;
 
+      const interruptKey = this.deployInterruptKey(projectSlug, branch);
+      if (this.suppressDeployFinalize.has(interruptKey)) {
+        this.log.log(`Deploy finalize ignorado (${interruptKey}): cancel ou restart`);
+        return;
+      }
+
       // Shell failed during ZD staging — keep previous version active.
       if (row.zeroDowntimeInProgress && row.status === 'active') {
         const message =
@@ -1308,7 +1479,7 @@ export class PreviewInstancesService {
       row.project.slug,
       row.branch,
     );
-    if (reserved === 'run') {
+    if (reserved !== 'queued') {
       await this.enqueueRedeployJob(
         row.project.slug,
         row.branch,
