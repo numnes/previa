@@ -2,6 +2,8 @@
 
 Preview URLs are served by **nginx on the previa host**. The core writes one `*.location` file per instance under the locations directory (default `~/previa/locations`). Each file is named `{project-slug}-{branch-slug}.location` and proxies `/{project-slug}/{branch-slug}/` to the instance's local port. Including the project slug in the path avoids collisions between different projects that share a branch name.
 
+Each location file also includes a **Socket.IO** block for `/{project-slug}/{branch-slug}/socket.io/` (HTTP/1.1, `Upgrade` / `Connection`, buffering off, 24h read/send timeouts). The parent preview location uses the same websocket headers and timeouts so other long-lived upgrades are not closed by nginx's default 60s `proxy_read_timeout`. Point the Socket.IO client `path` at `/{project-slug}/{branch-slug}/socket.io/` — the default `/socket.io/` on the host root is not unique per instance. Existing instances pick this up on the next deploy (the core rewrites the location file).
+
 When **Idle pause** is enabled on a project, each active location also writes an nginx `access_log` under the previa activity directory. After the configured idle minutes, the instance is slept and the location temporarily proxies to the previa API (`/internal/wake`), which resumes the process and returns **302** to the original URL.
 
 **You need a separate nginx `server` block (or equivalent site config) for every domain or subdomain used as a project's public URL.** If two projects use different hosts — e.g. `preview.app-a.example.com` and `preview.app-b.example.com` — configure nginx for **each** host and point the matching **Public URL** in the dashboard to that host.
