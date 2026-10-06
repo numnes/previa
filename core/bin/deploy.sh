@@ -84,6 +84,13 @@ cleanup_on_exit() {
 }
 trap cleanup_on_exit EXIT
 
+# Checkouts de preview são descartáveis: mudanças locais (lockfile, edits) nunca são preservadas.
+discard_local_checkout_changes() {
+  log "[deploy] discarding local changes in ${TARGET_DIR}"
+  git -C "$TARGET_DIR" reset --hard
+  git -C "$TARGET_DIR" clean -fd
+}
+
 clone_or_update_repo() {
   if [[ -d "${TARGET_DIR}/.git" ]]; then
     log "[deploy] updating checkout ${TARGET_DIR} → ${BRANCH}"
@@ -91,12 +98,18 @@ clone_or_update_repo() {
       git -C "$TARGET_DIR" remote set-url origin "$GIT_URL" 2>/dev/null || true
     fi
     git -C "$TARGET_DIR" fetch origin --prune
+    discard_local_checkout_changes
     if git -C "$TARGET_DIR" rev-parse --verify "origin/${BRANCH}" >/dev/null 2>&1; then
-      git -C "$TARGET_DIR" checkout -B "$BRANCH" "origin/${BRANCH}"
+      git -C "$TARGET_DIR" checkout -f -B "$BRANCH" "origin/${BRANCH}"
       git -C "$TARGET_DIR" reset --hard "origin/${BRANCH}"
+      git -C "$TARGET_DIR" clean -fd
     else
-      git -C "$TARGET_DIR" checkout "$BRANCH" || git -C "$TARGET_DIR" checkout -b "$BRANCH"
-      git -C "$TARGET_DIR" pull --ff-only origin "$BRANCH"
+      git -C "$TARGET_DIR" checkout -f "$BRANCH" || git -C "$TARGET_DIR" checkout -B "$BRANCH"
+      if ! git -C "$TARGET_DIR" pull --ff-only origin "$BRANCH"; then
+        git -C "$TARGET_DIR" fetch origin "$BRANCH"
+        git -C "$TARGET_DIR" reset --hard "origin/${BRANCH}"
+      fi
+      git -C "$TARGET_DIR" clean -fd
     fi
   else
     mkdir -p "$(dirname "$TARGET_DIR")"

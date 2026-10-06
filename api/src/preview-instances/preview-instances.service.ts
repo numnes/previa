@@ -930,28 +930,47 @@ export class PreviewInstancesService {
     });
     if (!row) return;
 
-    const runtimeName = meta.pm2Name || row.pm2Name;
-    const runner = (meta.runner ?? row.runner ?? 'pm2') as 'pm2' | 'docker';
-    const logs = runtimeName
-      ? await captureRuntimeLogs(runtimeName, runner)
-      : '(runtime sem nome)';
-
     const message =
       `Health check não respondeu HTTP ${expectedStatus} em ${timeoutMinutes} min.\n` +
       `URL: ${url}\n` +
       `Última tentativa: ${lastProbe}`;
 
+    // Sai de deploying antes de pause/logs: nginx reload ou pm2 logs não podem
+    // deixar a instância presa nesse status.
+    row.lastDeployError = message;
+    row.idleSleep = false;
+    row.zeroDowntimeInProgress = false;
+    await this.repo.save(row);
+    if (row.status !== 'error') {
+      await this.setStatus(row, 'error');
+    }
+
+    const runtimeName = meta.pm2Name || row.pm2Name;
+    const runner = (meta.runner ?? row.runner ?? 'pm2') as 'pm2' | 'docker';
     try {
-      await runCorePauseScript(this.config, projectSlug, branch);
+      await Promise.race([
+        runCorePauseScript(this.config, projectSlug, branch),
+        sleep(30_000).then(() => {
+          throw new Error('timeout pausando runtime após health check');
+        }),
+      ]);
     } catch (e) {
       const pauseErr = e instanceof Error ? e.message : String(e);
       this.log.warn(`Pause após health check falhou (${projectSlug}/${branch}): ${pauseErr}`);
     }
 
-    row.lastDeployError = appendRuntimeLogsToError(message, logs);
-    row.idleSleep = false;
-    await this.repo.save(row);
-    await this.setStatus(row, 'error');
+    if (runtimeName) {
+      const logs = await Promise.race([
+        captureRuntimeLogs(runtimeName, runner),
+        sleep(15_000).then(() => '(timeout ao capturar logs)'),
+      ]);
+      const fresh = await this.repo.findOne({ where: { id: row.id } });
+      if (fresh) {
+        fresh.lastDeployError = appendRuntimeLogsToError(message, logs);
+        await this.repo.save(fresh);
+      }
+    }
+
     await this.processWaitingQueue();
   }
 

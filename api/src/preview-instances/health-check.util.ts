@@ -68,27 +68,42 @@ export async function probeHealthCheckUrl(
   requestTimeoutMs = HEALTH_CHECK_REQUEST_TIMEOUT_MS,
 ): Promise<HealthProbeResult> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<HealthProbeResult>((resolve) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      resolve({
+        ok: false,
+        error: `timeout after ${requestTimeoutMs}ms`,
+      });
+    }, requestTimeoutMs);
+  });
+
+  const attempt = (async (): Promise<HealthProbeResult> => {
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        redirect: 'manual',
+        signal: controller.signal,
+      });
+      if (res.status === expectedStatus) {
+        return { ok: true, statusCode: res.status };
+      }
+      return {
+        ok: false,
+        statusCode: res.status,
+        error: `HTTP ${res.status} (esperado ${expectedStatus})`,
+      };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { ok: false, error: msg };
+    }
+  })();
 
   try {
-    const res = await fetch(url, {
-      method: 'GET',
-      redirect: 'manual',
-      signal: controller.signal,
-    });
-    if (res.status === expectedStatus) {
-      return { ok: true, statusCode: res.status };
-    }
-    return {
-      ok: false,
-      statusCode: res.status,
-      error: `HTTP ${res.status} (esperado ${expectedStatus})`,
-    };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, error: msg };
+    return await Promise.race([attempt, timeout]);
   } finally {
-    clearTimeout(timer);
+    if (timer) clearTimeout(timer);
   }
 }
 

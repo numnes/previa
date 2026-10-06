@@ -34,8 +34,13 @@ function deployPidPath(workRoot: string, projectSlug: string, branch: string): s
   return join(coreStateDir(workRoot), `${pm2AppName(projectSlug, branch)}.deploy.pid`);
 }
 
-/** Sessão própria para poder matar o grupo (git/npm/docker) sem derrubar a API. */
-function runDetachedScript(
+/**
+ * Roda o deploy no mesmo modelo do execFile (sem setsid).
+ * Uma sessão nova derrubava o processo PM2/Docker ao sair o script, e o
+ * health check ficava em connection refused com a instância presa em deploying.
+ * O evento é `exit`, não `close`: filhos que herdam o pipe (pm2) não seguram o job.
+ */
+function runDeployScript(
   script: string,
   args: string[],
   env: NodeJS.ProcessEnv,
@@ -43,18 +48,17 @@ function runDetachedScript(
   return new Promise((resolve, reject) => {
     const child = spawn(script, args, {
       env,
-      detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let output = '';
+    let settled = false;
     const append = (chunk: Buffer | string) => {
       output += chunk.toString();
       if (output.length > 200_000) output = output.slice(-200_000);
     };
-    child.stdout?.on('data', append);
-    child.stderr?.on('data', append);
-    child.on('error', reject);
-    child.on('close', (code, signal) => {
+    const finish = (code: number | null, signal: NodeJS.Signals | null) => {
+      if (settled) return;
+      settled = true;
       if (code === 0) {
         resolve();
         return;
@@ -64,22 +68,31 @@ function runDetachedScript(
       ) as Error & { stderr?: string };
       err.stderr = output;
       reject(err);
+    };
+    child.stdout?.on('data', append);
+    child.stderr?.on('data', append);
+    child.on('error', (err) => {
+      if (settled) return;
+      settled = true;
+      reject(err);
     });
+    child.on('exit', (code, signal) => finish(code, signal));
   });
 }
 
-function signalPid(pid: number, signal: NodeJS.Signals): boolean {
-  try {
-    process.kill(-pid, signal);
-    return true;
-  } catch {
-    try {
-      process.kill(pid, signal);
-      return true;
-    } catch {
-      return false;
-    }
-  }
+/** Mata o PID e os descendentes, sem sinal para o grupo da API. */
+async function killProcessTree(pid: number, signal: 'TERM' | 'KILL'): Promise<void> {
+  await execFileAsync(
+    'bash',
+    [
+      '-c',
+      'kill_tree() { local p="$1" s="$2" c; for c in $(pgrep -P "$p" 2>/dev/null); do kill_tree "$c" "$s"; done; kill -s "$s" "$p" 2>/dev/null || true; }; kill_tree "$1" "$2"',
+      'kill_tree',
+      String(pid),
+      signal,
+    ],
+    { timeout: 15_000 },
+  ).catch(() => undefined);
 }
 
 /** Mata o deploy.sh em andamento (e filhos) a partir do PID gravado no state dir. */
@@ -98,9 +111,9 @@ export async function killCoreDeployProcess(
     return false;
   }
   if (!Number.isInteger(pid) || pid <= 1) return false;
-  signalPid(pid, 'SIGTERM');
+  await killProcessTree(pid, 'TERM');
   await new Promise((r) => setTimeout(r, 1500));
-  signalPid(pid, 'SIGKILL');
+  await killProcessTree(pid, 'KILL');
   await unlink(pidPath).catch(() => undefined);
   return true;
 }
@@ -185,7 +198,7 @@ export async function runCoreDeployScript(
 
   const script = join(binDir, 'deploy.sh');
   try {
-    await runDetachedScript(script, [projectSlug, gitUrl, branch], env);
+    await runDeployScript(script, [projectSlug, gitUrl, branch], env);
   } finally {
     if (envFilePath) {
       await unlink(envFilePath).catch(() => undefined);
