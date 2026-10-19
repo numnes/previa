@@ -12,6 +12,7 @@ import {
 import { ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { InstancesService } from '../instances/instances.service';
+import { MetricsService } from '../metrics/metrics.service';
 import { ProjectsService } from '../projects/projects.service';
 import { ClusterKeyGuard } from './guards/cluster-key.guard';
 import { RequireClusterWrite } from './guards/cluster-write.decorator';
@@ -28,6 +29,7 @@ export class ClusterRemoteController {
     private readonly dashboard: DashboardService,
     private readonly projects: ProjectsService,
     private readonly instances: InstancesService,
+    private readonly metrics: MetricsService,
   ) {}
 
   @Get('node-info')
@@ -46,6 +48,25 @@ export class ClusterRemoteController {
   @Get('summary')
   async summary() {
     return this.dashboard.summary();
+  }
+
+  @Get('metrics/host')
+  hostMetrics(
+    @Query('days', new DefaultValuePipe(7), ParseIntPipe) days: number,
+  ) {
+    return this.metrics.getHostHistory(days);
+  }
+
+  @Get('metrics/network')
+  networkMetrics(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('pageSize', new DefaultValuePipe(50), ParseIntPipe) pageSize: number,
+  ) {
+    return this.metrics.listNetworkRequests({
+      page,
+      pageSize,
+      maxPageSize: 5000,
+    });
   }
 
   @Get('projects')

@@ -14,12 +14,15 @@ import { DeployModule } from './deploy/deploy.module';
 import { ApiKey } from './entities/api-key.entity';
 import { ClusterKey } from './entities/cluster-key.entity';
 import { ClusterNode } from './entities/cluster-node.entity';
+import { HostMetricSample } from './entities/host-metric-sample.entity';
+import { NetworkRequestEvent } from './entities/network-request-event.entity';
 import { PreviewInstanceStatusEvent } from './entities/preview-instance-status-event.entity';
 import { PreviewInstance } from './entities/preview-instance.entity';
 import { Project } from './entities/project.entity';
 import { Setting } from './entities/setting.entity';
 import { User } from './entities/user.entity';
 import { InstancesModule } from './instances/instances.module';
+import { MetricsModule } from './metrics/metrics.module';
 import { ProjectsModule } from './projects/projects.module';
 import { SettingsModule } from './settings/settings.module';
 import { SetupModule } from './setup/setup.module';
@@ -50,6 +53,8 @@ import { UsersModule } from './users/users.module';
           Project,
           PreviewInstance,
           PreviewInstanceStatusEvent,
+          HostMetricSample,
+          NetworkRequestEvent,
           Setting,
         ],
         synchronize: config.get<string>('TYPEORM_SYNC') === 'true',
@@ -78,6 +83,7 @@ import { UsersModule } from './users/users.module';
     DeployModule,
     InstancesModule,
     DashboardModule,
+    MetricsModule,
     SetupModule,
     UsersModule,
   ],

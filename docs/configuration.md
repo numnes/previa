@@ -49,6 +49,7 @@ If `previa.env` is absent, defaults stay on `http://localhost:<ports>` and ports
 | `PREVIA_SETUP_KEY`        | Root-only key for privileged bootstrap endpoints (auto-generated)                                   |
 | `PREVIA_CLUSTER_SECRET`   | Encrypts connected-node cluster keys in Postgres (auto-generated; must stay stable across restarts) |
 | `TYPEORM_SYNC`              | `true` for dev schema sync                                                                          |
+| `PREVIA_NGINX_ACCESS_LOG` | Optional comma-separated host nginx access logs to ingest into Metrics (see [metrics.md](metrics.md)) |
 
 ## Privileged endpoints (setup key)
 

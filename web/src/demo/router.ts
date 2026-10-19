@@ -2,6 +2,10 @@ import type { AuthUser } from '@/lib/client-auth';
 import { DEMO_TOKEN_PREFIX, isDemoToken } from './mode';
 import { findDemoUser } from './fixtures';
 import {
+  buildDemoHostMetrics,
+  buildDemoNetworkRequests,
+} from './fixtures';
+import {
   demoDashboard,
   getDemoStore,
   resetDemoStore,
@@ -95,6 +99,18 @@ export async function demoFetchJson<T>(
   if (method === 'GET' && parts[0] === 'dashboard' && parts[1] === 'summary') {
     await delay(150);
     return demoDashboard() as T;
+  }
+
+  if (method === 'GET' && parts[0] === 'metrics' && parts[1] === 'host') {
+    await delay(120);
+    return buildDemoHostMetrics() as T;
+  }
+
+  if (method === 'GET' && parts[0] === 'metrics' && parts[1] === 'network') {
+    await delay(120);
+    const page = Number(u.searchParams.get('page') || '1');
+    const pageSize = Number(u.searchParams.get('pageSize') || '50');
+    return buildDemoNetworkRequests({ page, pageSize }) as T;
   }
 
   if (parts[0] === 'projects') {

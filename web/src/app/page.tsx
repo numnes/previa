@@ -226,10 +226,17 @@ export default function HomePage() {
         {err ? <div className="alert-error mb-4">{err}</div> : null}
         <div className="grid gap-5 lg:grid-cols-2">
           <div className="card p-5 lg:col-span-2">
-            <h2 className="text-base font-semibold text-[#e8eaed]">Server resources</h2>
-            <p className="mt-1 text-sm text-[#8b919a]">
-              CPU, memory, and disk per connected previa node.
-            </p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-[#e8eaed]">Server resources</h2>
+                <p className="mt-1 text-sm text-[#8b919a]">
+                  CPU, memory, and disk per connected previa node.
+                </p>
+              </div>
+              <Link href="/metrics" className="btn text-sm">
+                Metrics
+              </Link>
+            </div>
             <div className="mt-4 space-y-4">
               {hosts.length > 0 ? (
                 hosts.map((h) => (

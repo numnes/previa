@@ -1,5 +1,9 @@
 import type { AuthUser, UserRole } from '@/lib/client-auth';
 import type { DashboardSummary, HostStats } from '@/app/::handlers/dashboard';
+import type {
+  AggregatedHostMetrics,
+  AggregatedNetworkRequests,
+} from '@/app/metrics/::handlers/metrics';
 import type { InstanceRow } from '@/app/instances/::handlers/instances';
 import type { Project } from '@/app/projects/::handlers/projects';
 import type { UserRow } from '@/app/users/::handlers/users';
@@ -633,4 +637,123 @@ export function createDemoAmplifyBranches(): AmplifyBranchRow[] {
       clickupTaskName: 'Hotfix copy',
     },
   ];
+}
+
+function demoHostSeries(node: NodeRef, scale: number): AggregatedHostMetrics['series'][number] {
+  const points = [];
+  const now = Date.now();
+  // ~7 days, 1 point / 30 min for a readable demo chart
+  for (let i = 7 * 48; i >= 0; i--) {
+    const t = now - i * 30 * 60_000;
+    const wave = 0.5 + 0.5 * Math.sin(i / 9 + scale);
+    points.push({
+      at: new Date(t).toISOString(),
+      cpuLoadPct: Math.min(95, Math.round((25 + 40 * wave) * scale)),
+      loadavg1: Number((1.1 * wave * scale).toFixed(2)),
+      loadavg5: Number((1.3 * wave * scale).toFixed(2)),
+      loadavg15: Number((1.0 * wave * scale).toFixed(2)),
+      memUsedPct: Math.min(92, Math.round((45 + 20 * wave) * scale)),
+      diskUsedPct: Math.min(90, Math.round(48 * scale + wave * 4)),
+      memUsedBytes: Math.round(20 * 1024 ** 3 * scale),
+      memTotalBytes: 32 * 1024 ** 3,
+      diskUsedBytes: Math.round(280 * 1024 ** 3 * scale),
+      diskTotalBytes: 500 * 1024 ** 3,
+      cpuCores: 8,
+    });
+  }
+  return { ...node, points };
+}
+
+export function buildDemoHostMetrics(): AggregatedHostMetrics {
+  const to = new Date();
+  const from = new Date(to.getTime() - 7 * 86400_000);
+  return {
+    retentionDays: 7,
+    from: from.toISOString(),
+    to: to.toISOString(),
+    series: [
+      demoHostSeries(LOCAL_NODE, 1),
+      demoHostSeries(REMOTE_NODE_A, 1.1),
+      demoHostSeries(REMOTE_NODE_B, 0.9),
+    ],
+  };
+}
+
+export function buildDemoNetworkRequests(opts?: {
+  page?: number;
+  pageSize?: number;
+}): AggregatedNetworkRequests {
+  const page = Math.max(1, opts?.page ?? 1);
+  const pageSize = Math.min(100, Math.max(1, opts?.pageSize ?? 50));
+  const to = new Date();
+  const from = new Date(to.getTime() - 7 * 86400_000);
+  const templates = [
+    {
+      ip: '203.0.113.44',
+      method: 'GET',
+      endpoint: '/shop-api/feature-checkout/api/health',
+      payload: null as string | null,
+      statusCode: 200,
+      region: 'US, CA',
+      projectSlug: 'shop-api',
+      branchSlug: 'feature-checkout',
+      nodeId: LOCAL_NODE.nodeId,
+      nodeLabel: LOCAL_NODE.nodeLabel,
+    },
+    {
+      ip: '10.0.0.12',
+      method: 'POST',
+      endpoint: '/docs-portal/pr-12/webhooks/stripe',
+      payload: 'id=evt_demo&type=invoice.paid',
+      statusCode: 201,
+      region: 'Local',
+      projectSlug: 'docs-portal',
+      branchSlug: 'pr-12',
+      nodeId: LOCAL_NODE.nodeId,
+      nodeLabel: LOCAL_NODE.nodeLabel,
+    },
+    {
+      ip: '198.51.100.7',
+      method: 'GET',
+      endpoint: '/shop-api/feature-checkout/socket.io/',
+      payload: 'EIO=4&transport=websocket',
+      statusCode: 101,
+      region: 'BR, SP',
+      projectSlug: 'shop-api',
+      branchSlug: 'feature-checkout',
+      nodeId: REMOTE_NODE_A.nodeId,
+      nodeLabel: REMOTE_NODE_A.nodeLabel,
+    },
+  ];
+  const all = Array.from({ length: 180 }, (_, i) => {
+    const t = templates[i % templates.length]!;
+    return {
+      id: `net-${i + 1}`,
+      at: new Date(to.getTime() - i * 55 * 60_000).toISOString(),
+      ip: t.ip,
+      method: t.method,
+      endpoint: t.endpoint,
+      payload: t.payload,
+      statusCode: t.statusCode,
+      region: t.region,
+      userAgent: 'demo-agent',
+      projectSlug: t.projectSlug,
+      branchSlug: t.branchSlug,
+      nodeId: t.nodeId,
+      nodeLabel: t.nodeLabel,
+    };
+  });
+  const total = all.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const start = (page - 1) * pageSize;
+  return {
+    retentionDays: 7,
+    from: from.toISOString(),
+    to: to.toISOString(),
+    page,
+    pageSize,
+    total,
+    totalPages,
+    items: all.slice(start, start + pageSize),
+  };
 }

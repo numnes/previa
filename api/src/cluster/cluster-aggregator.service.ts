@@ -1,8 +1,14 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException, forwardRef } from '@nestjs/common';
 import type { DashboardSummary } from '../dashboard/dashboard.service';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { Project } from '../entities/project.entity';
 import { ClusterNode } from '../entities/cluster-node.entity';
+import type {
+  HostMetricsHistory,
+  NetworkRequestRow,
+  NetworkRequestsPage,
+} from '../metrics/metrics.service';
+import { MetricsService } from '../metrics/metrics.service';
 import type { InstanceListItem } from '../preview-instances/preview-instances.service';
 import { PreviewInstancesService } from '../preview-instances/preview-instances.service';
 import { ProjectsService } from '../projects/projects.service';
@@ -20,6 +26,28 @@ import {
 const CLUSTER_HEADER = 'x-previa-cluster-key';
 const FETCH_TIMEOUT_MS = 12_000;
 
+export type AggregatedHostMetrics = {
+  retentionDays: number;
+  from: string;
+  to: string;
+  series: Array<
+    NodeRef & {
+      points: HostMetricsHistory['points'];
+    }
+  >;
+};
+
+export type AggregatedNetworkRequests = {
+  retentionDays: number;
+  from: string;
+  to: string;
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  items: Array<NetworkRequestRow & { nodeId: string; nodeLabel: string }>;
+};
+
 @Injectable()
 export class ClusterAggregatorService {
   private readonly log = new Logger(ClusterAggregatorService.name);
@@ -30,6 +58,8 @@ export class ClusterAggregatorService {
     private readonly dashboard: DashboardService,
     private readonly projects: ProjectsService,
     private readonly previewInstances: PreviewInstancesService,
+    @Inject(forwardRef(() => MetricsService))
+    private readonly metrics: MetricsService,
   ) {}
 
   private async clusterFetch<T>(
@@ -405,5 +435,128 @@ export class ClusterAggregatorService {
 
   parseRemoteInstanceId(id: string) {
     return parseRemoteId(id);
+  }
+
+  async aggregateHostMetrics(days = 7): Promise<AggregatedHostMetrics> {
+    const local = await this.nodeInfo.getLocalNodeRef();
+    const localHistory = await this.metrics.getHostHistory(days);
+    const series: AggregatedHostMetrics['series'] = [
+      {
+        ...local,
+        points: localHistory.points,
+      },
+    ];
+
+    const remotes = await this.nodes.findEnabled();
+    for (const node of remotes) {
+      const ref = this.remoteRef(node);
+      try {
+        const history = await this.clusterFetch<HostMetricsHistory>(
+          node,
+          `/cluster/metrics/host?days=${encodeURIComponent(String(days))}`,
+        );
+        series.push({ ...ref, points: history.points ?? [] });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        this.log.warn(`cluster host metrics ${node.label}: ${msg}`);
+        series.push({ ...ref, online: false, points: [] });
+      }
+    }
+
+    return {
+      retentionDays: 7,
+      from: localHistory.from,
+      to: localHistory.to,
+      series,
+    };
+  }
+
+  async aggregateNetworkRequests(opts?: {
+    page?: number;
+    pageSize?: number;
+  }): Promise<AggregatedNetworkRequests> {
+    const page = Math.max(1, Math.floor(opts?.page ?? 1) || 1);
+    const pageSize = Math.min(
+      100,
+      Math.max(1, Math.floor(opts?.pageSize ?? 50) || 50),
+    );
+    const local = await this.nodeInfo.getLocalNodeRef();
+    const remotes = await this.nodes.findEnabled();
+
+    type Tagged = NetworkRequestRow & { nodeId: string; nodeLabel: string };
+
+    if (remotes.length === 0) {
+      const localPage = await this.metrics.listNetworkRequests({
+        page,
+        pageSize,
+      });
+      return {
+        retentionDays: 7,
+        from: localPage.from,
+        to: localPage.to,
+        page: localPage.page,
+        pageSize: localPage.pageSize,
+        total: localPage.total,
+        totalPages: localPage.totalPages,
+        items: localPage.items.map((item) => ({
+          ...item,
+          nodeId: LOCAL_NODE_ID,
+          nodeLabel: local.nodeLabel,
+        })),
+      };
+    }
+
+    // Cada nó devolve os top (page*pageSize); o merge global mantém a página correta.
+    const fetchSize = Math.min(5000, page * pageSize);
+    const localPage = await this.metrics.listNetworkRequests({
+      page: 1,
+      pageSize: fetchSize,
+      maxPageSize: 5000,
+    });
+
+    let merged: Tagged[] = localPage.items.map((item) => ({
+      ...item,
+      nodeId: LOCAL_NODE_ID,
+      nodeLabel: local.nodeLabel,
+    }));
+    let total = localPage.total;
+
+    for (const node of remotes) {
+      try {
+        const remotePage = await this.clusterFetch<NetworkRequestsPage>(
+          node,
+          `/cluster/metrics/network?page=1&pageSize=${encodeURIComponent(String(fetchSize))}`,
+        );
+        total += remotePage.total ?? 0;
+        merged = [
+          ...merged,
+          ...(remotePage.items ?? []).map((item) => ({
+            ...item,
+            id: `${node.id}:${item.id}`,
+            nodeId: node.id,
+            nodeLabel: node.label,
+          })),
+        ];
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        this.log.warn(`cluster network metrics ${node.label}: ${msg}`);
+      }
+    }
+
+    merged.sort(
+      (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
+    );
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const start = (page - 1) * pageSize;
+    return {
+      retentionDays: 7,
+      from: localPage.from,
+      to: localPage.to,
+      page,
+      pageSize,
+      total,
+      totalPages,
+      items: merged.slice(start, start + pageSize),
+    };
   }
 }

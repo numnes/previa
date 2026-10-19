@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   IconBook,
+  IconChart,
   IconChevron,
   IconCloud,
   IconDashboard,
@@ -194,6 +195,11 @@ export function Sidebar() {
         href: "/",
         label: "Dashboard",
         icon: <IconDashboard />,
+      },
+      {
+        href: "/metrics",
+        label: "Metrics",
+        icon: <IconChart />,
       },
       {
         href: "/projects",

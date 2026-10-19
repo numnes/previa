@@ -170,6 +170,15 @@ export function IconDisk({ className = 'h-4 w-4' }: { className?: string }) {
   );
 }
 
+export function IconChart({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <path d="M3 3v18h18" />
+      <path d="M7 14l4-4 4 3 5-7" />
+    </svg>
+  );
+}
+
 export function IconStatusWaiting({ className = 'h-4 w-4' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
