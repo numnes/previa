@@ -11,6 +11,18 @@ const INSTANCE_STATUS_CLASS: Record<string, string> = {
   error: 'border-rose-400/40 bg-rose-500/15 text-rose-100/90',
 };
 
+export function resourceStatusBadgeClass(status: string): string {
+  const mapped =
+    status === 'running'
+      ? 'active'
+      : status === 'starting'
+        ? 'deploying'
+        : status === 'paused' || status === 'error'
+          ? status
+          : status;
+  return instanceStatusBadgeClass(mapped);
+}
+
 export function instanceStatusBadgeClass(
   status: string,
   opts?: { idleSleep?: boolean },

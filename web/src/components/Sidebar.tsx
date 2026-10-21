@@ -9,6 +9,7 @@ import {
   IconChevron,
   IconCloud,
   IconDashboard,
+  IconDatabase,
   IconFolder,
   IconGithub,
   IconLayers,
@@ -207,6 +208,7 @@ export function Sidebar() {
         icon: <IconFolder />,
         children: [
           { href: "/instances", label: "Instances", icon: <IconLayers /> },
+          { href: "/resources", label: "Resources", icon: <IconDatabase /> },
           { href: "/amplify", label: "Amplify", icon: <IconCloud /> },
         ],
       },

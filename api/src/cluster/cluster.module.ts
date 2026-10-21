@@ -7,6 +7,7 @@ import { InstancesModule } from '../instances/instances.module';
 import { MetricsModule } from '../metrics/metrics.module';
 import { PreviewInstancesModule } from '../preview-instances/preview-instances.module';
 import { ProjectsModule } from '../projects/projects.module';
+import { ResourcesModule } from '../resources/resources.module';
 import { SettingsModule } from '../settings/settings.module';
 import { ClusterAggregatorService } from './cluster-aggregator.service';
 import { ClusterNodeInfoService } from './cluster-node-info.service';
@@ -21,6 +22,7 @@ import { ClusterRemoteController } from './cluster-remote.controller';
     forwardRef(() => ProjectsModule),
     PreviewInstancesModule,
     forwardRef(() => InstancesModule),
+    forwardRef(() => ResourcesModule),
     forwardRef(() => MetricsModule),
     AuthModule,
   ],

@@ -14,6 +14,7 @@ import { DashboardService } from '../dashboard/dashboard.service';
 import { InstancesService } from '../instances/instances.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { ProjectsService } from '../projects/projects.service';
+import { ResourcesService } from '../resources/resources.service';
 import { ClusterKeyGuard } from './guards/cluster-key.guard';
 import { RequireClusterWrite } from './guards/cluster-write.decorator';
 import { ClusterNodeInfoService } from './cluster-node-info.service';
@@ -30,6 +31,7 @@ export class ClusterRemoteController {
     private readonly projects: ProjectsService,
     private readonly instances: InstancesService,
     private readonly metrics: MetricsService,
+    private readonly resources: ResourcesService,
   ) {}
 
   @Get('node-info')
@@ -126,5 +128,41 @@ export class ClusterRemoteController {
   @Post('instances/:id/remove')
   remove(@Param('id') id: string) {
     return this.instances.remove(id);
+  }
+
+  @Get('resources')
+  resourcesList() {
+    return this.resources.listLocalForApi();
+  }
+
+  @Get('resources/:id')
+  resourceOne(@Param('id') id: string) {
+    return this.resources.getLocalOneForApi(id);
+  }
+
+  @Get('resources/:id/logs')
+  resourceLogs(
+    @Param('id') id: string,
+    @Query('lines', new DefaultValuePipe(200), ParseIntPipe) lines: number,
+  ) {
+    return this.resources.logsLocal(id, lines);
+  }
+
+  @RequireClusterWrite()
+  @Post('resources/:id/start')
+  startResource(@Param('id') id: string) {
+    return this.resources.startLocal(id);
+  }
+
+  @RequireClusterWrite()
+  @Post('resources/:id/stop')
+  stopResource(@Param('id') id: string) {
+    return this.resources.stopLocal(id);
+  }
+
+  @RequireClusterWrite()
+  @Post('resources/:id/remove')
+  removeResource(@Param('id') id: string) {
+    return this.resources.removeLocal(id);
   }
 }

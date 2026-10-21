@@ -149,6 +149,7 @@ More detail: dashboard **Setup → GitHub Actions** and **Setup → Secrets**.
 | Dashboard         | [docs/dashboard.md](docs/dashboard.md) |
 | Instances & lifetime | [docs/instances.md](docs/instances.md) |
 | Cluster (multi-machine) | [docs/cluster.md](docs/cluster.md) |
+| Provisioned resources | [docs/resources.md](docs/resources.md) |
 | Metrics (CPU/mem/network) | [docs/metrics.md](docs/metrics.md) |
 | Configure nginx   | [docs/nginx.md](docs/nginx.md) |
 | Architecture      | [docs/architecture.md](docs/architecture.md) |

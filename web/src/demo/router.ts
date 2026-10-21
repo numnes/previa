@@ -1,10 +1,12 @@
 import type { AuthUser } from '@/lib/client-auth';
 import { DEMO_TOKEN_PREFIX, isDemoToken } from './mode';
-import { findDemoUser } from './fixtures';
 import {
   buildDemoHostMetrics,
   buildDemoNetworkRequests,
+  findDemoUser,
+  LOCAL_NODE,
 } from './fixtures';
+import type { ResourceRow } from '@/app/resources/::handlers/resources';
 import {
   demoDashboard,
   getDemoStore,
@@ -118,6 +120,9 @@ export async function demoFetchJson<T>(
   }
   if (parts[0] === 'instances') {
     return handleInstances(method, parts, body, u.searchParams, user) as Promise<T>;
+  }
+  if (parts[0] === 'resources') {
+    return handleResources(method, parts, body, u.searchParams, user) as Promise<T>;
   }
   if (parts[0] === 'users') {
     return handleUsers(method, parts, body, user) as T;
@@ -661,6 +666,126 @@ function handleApiKeys(
     return { apiKey: `dk_demo_${Math.random().toString(36).slice(2)}` };
   }
   throw new DemoHttpError(404, 'Unknown api-keys route');
+}
+
+async function handleResources(
+  method: string,
+  parts: string[],
+  body: unknown,
+  search: URLSearchParams,
+  user: AuthUser,
+) {
+  const s = getDemoStore();
+  const redact = <T extends { envVars?: Record<string, string>; connectionEnv?: Record<string, string>; connectionDotenv?: string }>(
+    row: T,
+  ): T => {
+    if (user.role === 'admin') return row;
+    return { ...row, envVars: {}, connectionEnv: {}, connectionDotenv: '' };
+  };
+  if (method === 'GET' && parts.length === 1) {
+    await delay(100);
+    return s.resources.map(redact);
+  }
+  if (method === 'POST' && parts.length === 1) {
+    requireAdmin(user);
+    const b = body as {
+      slug: string;
+      label?: string;
+      kind: ResourceRow['kind'];
+      image?: string;
+      dockerfile?: string;
+      composeYaml?: string;
+      containerPorts?: number[];
+      envVars?: Record<string, string>;
+      start?: boolean;
+    };
+    const slug = b.slug.trim();
+    if (s.resources.some((r) => r.slug === slug)) {
+      throw new DemoHttpError(409, 'Slug already exists');
+    }
+    const running = !!b.start;
+    const row: ResourceRow = {
+      id: `res-${Date.now()}`,
+      slug,
+      label: b.label?.trim() || slug,
+      kind: b.kind,
+      image: b.image ?? null,
+      dockerfile: b.dockerfile ?? null,
+      composeYaml: b.composeYaml ?? null,
+      containerPorts: b.containerPorts ?? [6379],
+      publishedPorts: running ? { '6379': 17000 } : {},
+      envVars: b.envVars ?? {},
+      connectionEnv: running
+        ? {
+            ...(b.envVars ?? {}),
+            [`${slug.replace(/-/g, '_').toUpperCase()}_HOST`]: '127.0.0.1',
+            [`${slug.replace(/-/g, '_').toUpperCase()}_PORT`]: '17000',
+          }
+        : {},
+      connectionDotenv: running ? 'DEMO_HOST=127.0.0.1\nDEMO_PORT=17000\n' : '',
+      status: running ? 'running' : 'paused',
+      runtimeOnline: running,
+      runtimeStatus: running ? 'Up' : null,
+      runtimeName: `prv-res-${slug}`,
+      lastError: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...LOCAL_NODE,
+    };
+    s.resources.push(row);
+    s.logs[row.id] = `[demo] resource ${slug} ready`;
+    return redact(row);
+  }
+  const id = parts[1];
+  const row = s.resources.find((r) => r.id === id);
+  if (!row) throw new DemoHttpError(404, 'Resource not found');
+  if (method === 'GET' && parts.length === 2) return redact(row);
+  if (method === 'GET' && parts[2] === 'logs') {
+    const lines = Number(search.get('lines') ?? 200);
+    return {
+      runtimeName: row.runtimeName,
+      lines,
+      output: (s.logs[id] ?? '(no logs)').split('\n').slice(-lines).join('\n'),
+    };
+  }
+  if (method === 'PATCH' && parts.length === 2) {
+    requireAdmin(user);
+    const b = body as { envVars?: Record<string, string>; label?: string };
+    if (b.label) row.label = b.label;
+    if (b.envVars) row.envVars = b.envVars;
+    row.updatedAt = new Date().toISOString();
+    return redact(row);
+  }
+  if (method === 'POST' && parts[2] === 'start') {
+    if (!row.canWrite) throw new DemoHttpError(403, 'Read-only node');
+    await delay(400);
+    row.status = 'running';
+    row.runtimeOnline = true;
+    row.publishedPorts = { [String(row.containerPorts[0] ?? 6379)]: 16379 };
+    row.connectionEnv = {
+      ...(row.envVars ?? {}),
+      [`${row.slug.replace(/-/g, '_').toUpperCase()}_HOST`]: '127.0.0.1',
+      [`${row.slug.replace(/-/g, '_').toUpperCase()}_PORT`]: '16379',
+    };
+    row.connectionDotenv = Object.entries(row.connectionEnv)
+      .map(([k, v]) => `${k}=${v}`)
+      .join('\n');
+    row.updatedAt = new Date().toISOString();
+    return redact(row);
+  }
+  if (method === 'POST' && parts[2] === 'stop') {
+    if (!row.canWrite) throw new DemoHttpError(403, 'Read-only node');
+    row.status = 'paused';
+    row.runtimeOnline = false;
+    row.updatedAt = new Date().toISOString();
+    return redact(row);
+  }
+  if (method === 'POST' && parts[2] === 'remove') {
+    requireAdmin(user);
+    s.resources = s.resources.filter((r) => r.id !== id);
+    return { ok: true };
+  }
+  throw new DemoHttpError(404, 'Unknown resources route');
 }
 
 export function bootstrapDemoSession() {

@@ -12,6 +12,8 @@ import { MetricsService } from '../metrics/metrics.service';
 import type { InstanceListItem } from '../preview-instances/preview-instances.service';
 import { PreviewInstancesService } from '../preview-instances/preview-instances.service';
 import { ProjectsService } from '../projects/projects.service';
+import type { ResourceListItem } from '../resources/resources.service';
+import { ResourcesService } from '../resources/resources.service';
 import { ClusterNodesService } from '../cluster-nodes/cluster-nodes.service';
 import { ClusterNodeInfoService } from './cluster-node-info.service';
 import {
@@ -60,12 +62,14 @@ export class ClusterAggregatorService {
     private readonly previewInstances: PreviewInstancesService,
     @Inject(forwardRef(() => MetricsService))
     private readonly metrics: MetricsService,
+    @Inject(forwardRef(() => ResourcesService))
+    private readonly resources: ResourcesService,
   ) {}
 
   private async clusterFetch<T>(
     node: ClusterNode,
     path: string,
-    init?: { method?: string; body?: unknown },
+    init?: { method?: string; body?: unknown; timeoutMs?: number },
   ): Promise<T> {
     const url = `${node.baseUrl.replace(/\/+$/, '')}${path}`;
     const hasBody = init?.body !== undefined;
@@ -79,7 +83,7 @@ export class ClusterAggregatorService {
       },
       body: hasBody ? JSON.stringify(init?.body) : undefined,
       cache: 'no-store',
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      signal: AbortSignal.timeout(init?.timeoutMs ?? FETCH_TIMEOUT_MS),
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
@@ -558,5 +562,92 @@ export class ClusterAggregatorService {
       totalPages,
       items: merged.slice(start, start + pageSize),
     };
+  }
+
+  async aggregateResources(): Promise<WithNode<ResourceListItem>[]> {
+    const local = await this.nodeInfo.getLocalNodeRef();
+    const localRows = (await this.resources.listLocalForApi()).map((r) =>
+      this.tag(r, local),
+    );
+    const remotes = await this.nodes.findEnabled();
+    const remoteRows: WithNode<ResourceListItem>[] = [];
+    for (const node of remotes) {
+      const ref = this.remoteRef(node);
+      try {
+        const rows = await this.clusterFetch<ResourceListItem[]>(
+          node,
+          '/cluster/resources',
+        );
+        for (const r of rows) {
+          remoteRows.push(this.tag(r, ref, encodeRemoteId(node.id, r.id)));
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        this.log.warn(`cluster resources ${node.label}: ${msg}`);
+        ref.online = false;
+      }
+    }
+    return [...localRows, ...remoteRows].sort((a, b) =>
+      `${a.nodeLabel}:${a.slug}`.localeCompare(`${b.nodeLabel}:${b.slug}`),
+    );
+  }
+
+  async getRemoteResource(
+    nodeId: string,
+    remoteId: string,
+  ): Promise<WithNode<ResourceListItem>> {
+    const node = await this.nodes.findById(nodeId);
+    const ref = this.remoteRef(node);
+    const found = await this.clusterFetch<ResourceListItem>(
+      node,
+      `/cluster/resources/${encodeURIComponent(remoteId)}`,
+    ).catch(() => null);
+    if (!found) throw new NotFoundException('Recurso remoto não encontrado');
+    return this.tag(found, ref, encodeRemoteId(node.id, found.id));
+  }
+
+  async startRemoteResource(nodeId: string, remoteId: string) {
+    const node = await this.nodes.findById(nodeId);
+    const ref = this.remoteRef(node);
+    const updated = await this.clusterFetch<ResourceListItem>(
+      node,
+      `/cluster/resources/${encodeURIComponent(remoteId)}/start`,
+      { method: 'POST', timeoutMs: 180_000 },
+    );
+    return this.tag(updated, ref, encodeRemoteId(node.id, updated.id));
+  }
+
+  async stopRemoteResource(nodeId: string, remoteId: string) {
+    const node = await this.nodes.findById(nodeId);
+    const ref = this.remoteRef(node);
+    const updated = await this.clusterFetch<ResourceListItem>(
+      node,
+      `/cluster/resources/${encodeURIComponent(remoteId)}/stop`,
+      { method: 'POST' },
+    );
+    return this.tag(updated, ref, encodeRemoteId(node.id, updated.id));
+  }
+
+  async removeRemoteResource(nodeId: string, remoteId: string) {
+    const node = await this.nodes.findById(nodeId);
+    await this.clusterFetch<{ ok: true }>(
+      node,
+      `/cluster/resources/${encodeURIComponent(remoteId)}/remove`,
+      { method: 'POST' },
+    );
+    return { ok: true as const };
+  }
+
+  async remoteResourceLogs(nodeId: string, remoteId: string, lines: number) {
+    const node = await this.nodes.findById(nodeId);
+    const safeLines = Math.min(Math.max(lines, 10), 2000);
+    return this.clusterFetch<{
+      runtimeName: string;
+      lines: number;
+      output: string;
+    }>(
+      node,
+      `/cluster/resources/${encodeURIComponent(remoteId)}/logs?lines=${safeLines}`,
+    );
   }
 }

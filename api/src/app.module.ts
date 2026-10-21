@@ -19,11 +19,13 @@ import { NetworkRequestEvent } from './entities/network-request-event.entity';
 import { PreviewInstanceStatusEvent } from './entities/preview-instance-status-event.entity';
 import { PreviewInstance } from './entities/preview-instance.entity';
 import { Project } from './entities/project.entity';
+import { ProvisionedResource } from './entities/provisioned-resource.entity';
 import { Setting } from './entities/setting.entity';
 import { User } from './entities/user.entity';
 import { InstancesModule } from './instances/instances.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { ProjectsModule } from './projects/projects.module';
+import { ResourcesModule } from './resources/resources.module';
 import { SettingsModule } from './settings/settings.module';
 import { SetupModule } from './setup/setup.module';
 import { UsersModule } from './users/users.module';
@@ -55,6 +57,7 @@ import { UsersModule } from './users/users.module';
           PreviewInstanceStatusEvent,
           HostMetricSample,
           NetworkRequestEvent,
+          ProvisionedResource,
           Setting,
         ],
         synchronize: config.get<string>('TYPEORM_SYNC') === 'true',
@@ -82,6 +85,7 @@ import { UsersModule } from './users/users.module';
     SettingsModule,
     DeployModule,
     InstancesModule,
+    ResourcesModule,
     DashboardModule,
     MetricsModule,
     SetupModule,

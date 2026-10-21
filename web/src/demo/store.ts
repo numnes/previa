@@ -8,6 +8,7 @@ import {
   createDemoClusterNodes,
   createDemoInstances,
   createDemoProjects,
+  createDemoResources,
   createDemoUsers,
   DEMO_AMPLIFY_APP_ID,
   type DemoInstance,
@@ -20,11 +21,13 @@ import type {
 } from '@/app/settings/::handlers/cluster';
 import type { UserRow } from '@/app/users/::handlers/users';
 import type { DashboardSummary } from '@/app/::handlers/dashboard';
+import type { ResourceRow } from '@/app/resources/::handlers/resources';
 
 export type DemoStore = {
   users: UserRow[];
   projects: DemoProject[];
   instances: DemoInstance[];
+  resources: ResourceRow[];
   clusterKeys: ClusterKeyRow[];
   clusterNodes: ClusterNodeRow[];
   apiKeys: ApiKeyRow[];
@@ -51,6 +54,7 @@ function freshStore(): DemoStore {
     users: createDemoUsers(),
     projects,
     instances,
+    resources: createDemoResources(),
     clusterKeys: createDemoClusterKeys(),
     clusterNodes: createDemoClusterNodes(),
     apiKeys: createDemoApiKeys(),

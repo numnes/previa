@@ -14,6 +14,7 @@ import type {
 } from '@/app/settings/::handlers/cluster';
 import type { NodeRef } from '@/lib/node-ref';
 import type { AmplifyBranchRow } from '@/app/amplify/::handlers/amplify';
+import type { ResourceRow } from '@/app/resources/::handlers/resources';
 
 export const DEMO_CREDENTIALS = {
   admin: { email: 'admin@demo.local', password: 'demo' },
@@ -536,6 +537,11 @@ export const DEMO_INSTANCE_STATIC_PARAMS = [
   { id: 'r:node-edge-2:inst-analytics-wait' },
 ];
 
+export const DEMO_RESOURCE_STATIC_PARAMS = [
+  { id: 'res-redis' },
+  { id: 'res-postgres' },
+];
+
 export const DEMO_AMPLIFY_APP_ID = 'd0exampleappid';
 export const DEMO_AMPLIFY_DOMAIN = `${DEMO_AMPLIFY_APP_ID}.amplifyapp.com`;
 
@@ -756,4 +762,58 @@ export function buildDemoNetworkRequests(opts?: {
     totalPages,
     items: all.slice(start, start + pageSize),
   };
+}
+
+export function createDemoResources(): ResourceRow[] {
+  return [
+    {
+      id: 'res-redis',
+      slug: 'redis-shared',
+      label: 'Shared Redis',
+      kind: 'image',
+      image: 'redis:7-alpine',
+      dockerfile: null,
+      composeYaml: null,
+      containerPorts: [6379],
+      publishedPorts: { '6379': 16379 },
+      envVars: { REDIS_PASSWORD: 'demo-secret' },
+      connectionEnv: {
+        REDIS_PASSWORD: 'demo-secret',
+        REDIS_SHARED_HOST: '127.0.0.1',
+        REDIS_SHARED_PORT: '16379',
+      },
+      connectionDotenv:
+        'REDIS_PASSWORD=demo-secret\nREDIS_SHARED_HOST=127.0.0.1\nREDIS_SHARED_PORT=16379\n',
+      status: 'running',
+      runtimeOnline: true,
+      runtimeStatus: 'Up 2 hours',
+      runtimeName: 'prv-res-redis-shared',
+      lastError: null,
+      createdAt: hoursAgo(48),
+      updatedAt: hoursAgo(2),
+      ...LOCAL_NODE,
+    },
+    {
+      id: 'res-postgres',
+      slug: 'pg-preview',
+      label: 'Preview Postgres',
+      kind: 'compose',
+      image: null,
+      dockerfile: null,
+      composeYaml: 'services:\n  db:\n    image: postgres:16\n    ports:\n      - "5432"\n',
+      containerPorts: [5432],
+      publishedPorts: {},
+      envVars: { POSTGRES_PASSWORD: 'demo' },
+      connectionEnv: {},
+      connectionDotenv: '',
+      status: 'paused',
+      runtimeOnline: false,
+      runtimeStatus: 'Exited',
+      runtimeName: 'prvrespgpreview',
+      lastError: null,
+      createdAt: hoursAgo(12),
+      updatedAt: hoursAgo(3),
+      ...LOCAL_NODE,
+    },
+  ];
 }
